@@ -145,7 +145,9 @@ tasks:
 
       **How to do it:** build the POST from task 1 (method, body, `Content-Type`),
       press **Send**, then click **Console** in the mini-Postman's bottom bar — the log
-      opens below the response. Click its top row — it will expand. ▶ marks what was sent to the server, ◀ marks what came back.
+      opens below the response. If it's already open, there's no need to click: the new
+      request shows up in it right away. The top row of the log is the latest request,
+      already expanded; clicking a row collapses or expands it. ▶ marks what was sent to the server, ◀ marks what came back.
 
       **What you should see:** you can point to where the Console shows
       `Content-Type: application/json` and the JSON you sent.
