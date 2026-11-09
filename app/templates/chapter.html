@@ -1,7 +1,10 @@
 {% extends "base.html" %}
 {% block title %}{{ chapter.title }} — {{ _(settings.app_name) }}{% endblock %}
 {% block head %}
-  <script>window.TASKS = {{ tasks_js | tojson }};</script>
+  <script>
+    window.TASKS = {{ tasks_js | tojson }};
+    window.TASK_ORDER = {{ tasks | map(attribute="id") | list | tojson }};
+  </script>
 {% endblock %}
 {% block header_right %}
   <span class="text-slate-500 hidden sm:inline">{{ _("Глава {n}", n=chapter.order) }}</span>
@@ -11,7 +14,7 @@
 {% endblock %}
 
 {% block content %}
-<div x-data x-init="{% for t in tasks %}{% if t.id in passed %}$store.task.passed['{{ t.id }}'] = true;{% endif %}{% endfor %}"
+<div x-data x-init="{% for t in tasks %}{% if t.id in passed %}$store.task.passed['{{ t.id }}'] = true;{% endif %}{% endfor %}$store.task.openFirst();"
      class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,560px)]">
 
   {# ---------- Левая колонка: теория и задания ---------- #}

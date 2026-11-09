@@ -47,7 +47,7 @@ run: ## Запустить без автоперезагрузки
 test: ## Запустить Python-тесты (включая прогон контента через checker.js)
 	$(BIN)/pytest -q
 
-test-js: ## Unit-тесты проверки ответов (static/js/checker.js), нужен Node.js 18+
+test-js: ## Unit-тесты JS (static/js/checker.js, task_order.js), нужен Node.js 18+
 	node --test tests/js/*.test.cjs
 
 lint: ## Проверить код ruff

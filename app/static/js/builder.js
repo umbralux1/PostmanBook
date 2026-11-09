@@ -54,19 +54,51 @@ document.addEventListener("alpine:init", function () {
   var HEADER_NAMES = ["Content-Type", "Accept", "Authorization", "X-Debug-Source", "Cache-Control"];
   var MAX_LOG = 10;
 
+  // Пауза перед автопереходом: ученик успевает увидеть, что задание засчитано.
+  var ADVANCE_DELAY_MS = 2000;
+  var advanceTimer = null;
+
   Alpine.store("task", {
     id: null,
     title: "",
     expected: null,
     passed: {},
-    select: function (id, title, expected, fromRemote) {
+    // opts.reveal: раскрыть карточку задания и прокрутить к ней (автопереход).
+    select: function (id, title, expected, fromRemote, opts) {
+      clearTimeout(advanceTimer);
       this.id = id;
       this.title = title;
       this.expected = expected;
       if (!fromRemote && window.Collab) window.Collab.local("taskId", id);
       window.dispatchEvent(new CustomEvent("task-selected", { detail: { id: id } }));
+      if (opts && opts.reveal) {
+        window.dispatchEvent(new CustomEvent("task-reveal", { detail: { id: id } }));
+        return;
+      }
       var el = document.getElementById("builder");
       if (el && window.innerWidth < 1024) el.scrollIntoView({ behavior: "smooth" });
+    },
+    selectById: function (id, fromRemote, opts) {
+      var info = (window.TASKS || {})[id];
+      if (info) this.select(id, info.title, info.expected, fromRemote, opts);
+    },
+    // При открытии главы — первое невыполненное задание. Не рассылается в комнату:
+    // если там уже выбрано задание, оно придёт в welcome и заменит это.
+    openFirst: function () {
+      var id = window.TaskOrder.firstOpen(window.TASK_ORDER || [], this.passed);
+      if (id) this.selectById(id, true);
+    },
+    // Задание засчитано → через паузу следующее невыполненное по порядку.
+    // Вызывает только тот, кто засчитал: выбор разойдётся по комнате как taskId.
+    // Если за паузу выбрали другое задание, переход отменяется (select сбрасывает таймер).
+    advanceFrom: function (id) {
+      var self = this;
+      clearTimeout(advanceTimer);
+      advanceTimer = setTimeout(function () {
+        if (self.id !== id) return;
+        var next = window.TaskOrder.nextAfter(window.TASK_ORDER || [], self.passed, id);
+        if (next) self.selectById(next, false, { reveal: true });
+      }, ADVANCE_DELAY_MS);
     },
   });
 
@@ -135,9 +167,8 @@ document.addEventListener("alpine:init", function () {
 
       applyRemote: function (field, value) {
         if (field === "taskId") {
-          var info = (window.TASKS || {})[value];
           var store = Alpine.store("task");
-          if (info) store.select(value, info.title, info.expected, true);
+          if ((window.TASKS || {})[value]) store.selectById(value, true);
           else if (value === null) store.select(null, "", null, true);
           return;
         }
@@ -398,6 +429,7 @@ document.addEventListener("alpine:init", function () {
       complete: async function (taskId, list) {
         var task = Alpine.store("task");
         task.passed[taskId] = true;
+        task.advanceFrom(taskId);
         try {
           await fetch("/api/tasks/" + encodeURIComponent(taskId) + "/complete", {
             method: "POST",
