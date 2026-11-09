@@ -16,6 +16,10 @@ RUN pip install -e .
 COPY alembic.ini ./
 COPY alembic ./alembic
 
+# Приложение работает не от root: папка должна быть доступна пользователю trainer
+# (иначе SQLite без настроенной базы не сможет создать файл).
+RUN chown -R trainer:trainer /srv
+
 USER trainer
 EXPOSE 8000
 

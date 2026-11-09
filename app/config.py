@@ -1,9 +1,10 @@
 """Настройки приложения (читаются из переменных окружения и .env)."""
 
+import os
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import field_validator
+from pydantic import AliasChoices, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -14,7 +15,11 @@ class Settings(BaseSettings):
 
     app_name: str = "HTTP-тренажёр"
     debug: bool = False
-    database_url: str = "sqlite:///./trainer.db"
+    # TRAINER_DATABASE_URL или стандартное DATABASE_URL (так его часто называют хостинги).
+    database_url: str = Field(
+        default="sqlite:///./trainer.db",
+        validation_alias=AliasChoices("TRAINER_DATABASE_URL", "DATABASE_URL", "database_url"),
+    )
     # Готовить БД при старте: применить миграции Alembic (in-memory SQLite — create_all).
     # В Docker миграции запускаются отдельной командой перед стартом, здесь можно false.
     auto_create_tables: bool = True
@@ -40,6 +45,25 @@ class Settings(BaseSettings):
             if url.startswith(prefix):
                 return "postgresql+psycopg://" + url[len(prefix) :]
         return url
+
+
+class DatabaseNotConfiguredError(RuntimeError):
+    pass
+
+
+def check_database_for_hosting(settings: Settings) -> None:
+    """На Render SQLite бесполезна: файловая система временная, данные теряются.
+
+    Вместо непонятной ошибки sqlite3 сразу говорим, что нужно настроить.
+    """
+    if os.environ.get("RENDER") and settings.database_url.startswith("sqlite"):
+        raise DatabaseNotConfiguredError(
+            "База данных не настроена. На Render задайте переменную TRAINER_DATABASE_URL "
+            "(или DATABASE_URL) = Internal Database URL вашей базы Postgres: "
+            "Dashboard → сервис → Environment. Проще всего создать сервис через "
+            "New → Blueprint: render.yaml создаст базу и переменную сам. "
+            "SQLite на Render не подходит — данные теряются при каждом перезапуске."
+        )
 
 
 @lru_cache

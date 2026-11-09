@@ -6,7 +6,7 @@ from alembic import context
 from sqlmodel import SQLModel
 
 import app.models  # noqa: F401 — регистрирует таблицы в metadata
-from app.config import get_settings
+from app.config import check_database_for_hosting, get_settings
 from app.db import make_engine
 
 config = context.config
@@ -14,6 +14,7 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 target_metadata = SQLModel.metadata
+check_database_for_hosting(get_settings())
 
 
 def run_migrations_offline() -> None:

@@ -319,6 +319,16 @@ app/content/tasks/ch01.en.yaml
 После первого деплоя откройте главу 1 и убедитесь, что в задании 1 адрес начинается с
 `https://` и с вашего домена.
 
+**Если сервис создан не через Blueprint** (New → Web Service), `render.yaml` не
+применяется: базы и переменных нет. При старте вы увидите ошибку
+«База данных не настроена». Исправление:
+
+1. New → Postgres, создайте базу.
+2. Сервис → **Environment** → добавьте `TRAINER_DATABASE_URL` (или `DATABASE_URL`) со
+   значением **Internal Database URL** из страницы базы. Ещё добавьте
+   `TRAINER_COOKIE_SECURE=true` и `TRAINER_AUTO_CREATE_TABLES=false`.
+3. **Manual Deploy → Deploy latest commit**.
+
 ## Развёртывание на VPS
 
 1. Установите Docker и плагин compose (Ubuntu: `curl -fsSL https://get.docker.com | sh`).

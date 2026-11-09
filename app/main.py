@@ -13,7 +13,7 @@ from sqlmodel import Session
 
 from app import pages
 from app.api import echo, external_check, progress, rooms, tasks, tickets
-from app.config import BASE_DIR, get_settings
+from app.config import BASE_DIR, check_database_for_hosting, get_settings
 from app.db import get_engine, prepare_database
 from app.dependencies import SESSION_COOKIE, limiter, new_session_token
 from app.errors import install_error_handlers
@@ -26,6 +26,7 @@ log = logging.getLogger("trainer.http")
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
+    check_database_for_hosting(settings)
     engine = get_engine()
     if settings.auto_create_tables:
         prepare_database(engine, settings.database_url)
