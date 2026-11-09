@@ -20,7 +20,10 @@ USER trainer
 EXPOSE 8000
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s \
-  CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz')" || exit 1
+  CMD python -c "import os, urllib.request; urllib.request.urlopen('http://127.0.0.1:%s/healthz' % os.environ.get('PORT', '8000'))" || exit 1
 
 # Миграции → запуск. Контент из YAML синхронизируется при старте приложения.
-CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --proxy-headers --forwarded-allow-ips='*'"]
+# PORT задают хостинги (Render — 10000); локально и в docker compose — 8000.
+# --forwarded-allow-ips='*': доверять X-Forwarded-Proto от прокси хостинга, иначе
+# за HTTPS-прокси приложение решит, что оно на http://, и адреса в заданиях сломаются.
+CMD ["sh", "-c", "alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --proxy-headers --forwarded-allow-ips='*'"]

@@ -1,5 +1,8 @@
 {% extends "base.html" %}
 {% block title %}{{ chapter.title }} — {{ _(settings.app_name) }}{% endblock %}
+{% block head %}
+  <script>window.TASKS = {{ tasks_js | tojson }};</script>
+{% endblock %}
 {% block header_right %}
   <span class="text-slate-500 hidden sm:inline">{{ _("Глава {n}", n=chapter.order) }}</span>
   <span hx-get="/partials/progress/{{ chapter.id }}" hx-trigger="progress-changed from:body" hx-swap="innerHTML">
@@ -35,7 +38,7 @@
 
     <h2 class="mt-8 text-xl font-bold text-slate-900">{{ _("Задания") }}</h2>
     <p class="text-sm text-slate-500 mt-1">{{ _("Нажми «Решать», собери запрос в мини-Postman и отправь. Проверка — автоматическая.") }}</p>
-    <div class="mt-4 space-y-3">
+    <div id="tasks-list" class="mt-4 space-y-3">
       {% for task in tasks %}
         {% include "components/task_card.html" %}
       {% endfor %}

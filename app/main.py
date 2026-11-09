@@ -12,7 +12,7 @@ from slowapi.errors import RateLimitExceeded
 from sqlmodel import Session
 
 from app import pages
-from app.api import echo, external_check, progress, tasks, tickets
+from app.api import echo, external_check, progress, rooms, tasks, tickets
 from app.config import BASE_DIR, get_settings
 from app.db import get_engine, prepare_database
 from app.dependencies import SESSION_COOKIE, limiter, new_session_token
@@ -99,7 +99,14 @@ def create_app() -> FastAPI:
         return response
 
     app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
-    for r in (echo.router, tickets.router, tasks.router, external_check.router, progress.router):
+    for r in (
+        echo.router,
+        tickets.router,
+        tasks.router,
+        external_check.router,
+        progress.router,
+        rooms.router,
+    ):
         app.include_router(r)
     app.include_router(pages.router)
 

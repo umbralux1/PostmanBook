@@ -7,10 +7,12 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlmodel import col, select
 
+from app.api.rooms import credit_room
 from app.dependencies import RATE_LIMIT, RequiredUserDep, SessionDep, limiter
 from app.errors import ApiError
 from app.models import Attempt, ReceivedRequest, Task
 from app.services import recorder
+from app.services.room_hub import hub
 from app.services.sse import broker
 
 router = APIRouter(prefix="/api/tasks", tags=["tasks"])
@@ -84,25 +86,33 @@ class CompleteIn(BaseModel):
 
 @router.post("/{task_code}/complete")
 @limiter.limit(RATE_LIMIT)
-def complete_task(
+async def complete_task(
     request: Request,
     task_code: str,
     body: CompleteIn,
     session: SessionDep,
     user: RequiredUserDep,
 ) -> dict[str, Any]:
-    """Фаза 1: фронт проверил ответ сервера и сообщает, что задание выполнено."""
+    """Фаза 1: фронт проверил ответ сервера и сообщает, что задание выполнено.
+
+    Мини-Postman в комнате общий, поэтому задание засчитывается всем, кто
+    сейчас онлайн в комнате пользователя.
+    """
     task = get_task_or_404(session, task_code)
     if task.phase != 1:
         raise ApiError(400, "wrong_phase", "Это задание засчитывается не через мини-Postman.")
-    session.add(
-        Attempt(
-            user_id=user.id,
-            task_id=task.id,
-            passed=True,
-            request_payload={"source": "emulator"},
-            response_payload={"responses": body.responses},
+    credited = credit_room(session, user)
+    for user_id in credited:
+        session.add(
+            Attempt(
+                user_id=user_id,
+                task_id=task.id,
+                passed=True,
+                request_payload={"source": "emulator", "by": str(user.id)},
+                response_payload={"responses": body.responses},
+            )
         )
-    )
     session.commit()
-    return {"task_id": task.id, "passed": True}
+    if user.room_id:
+        await hub.broadcast(user.room_id, {"type": "task_completed", "task_id": task.id})
+    return {"task_id": task.id, "passed": True, "credited": len(credited)}

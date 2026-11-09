@@ -3,6 +3,7 @@
 from functools import lru_cache
 from pathlib import Path
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -26,6 +27,19 @@ class Settings(BaseSettings):
     public_base_url: str = "http://localhost:8000"
     cookie_secure: bool = False
     max_body_bytes: int = 64 * 1024
+
+    @field_validator("database_url")
+    @classmethod
+    def _postgres_driver(cls, url: str) -> str:
+        """Хостинги (Render, Heroku) выдают postgres://… или postgresql://… без драйвера.
+
+        SQLAlchemy по умолчанию взял бы psycopg2, которого нет в зависимостях, —
+        подставляем psycopg (v3).
+        """
+        for prefix in ("postgres://", "postgresql://"):
+            if url.startswith(prefix):
+                return "postgresql+psycopg://" + url[len(prefix) :]
+        return url
 
 
 @lru_cache

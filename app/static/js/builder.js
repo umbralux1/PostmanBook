@@ -1,6 +1,27 @@
 // Мини-Postman: собирает запрос, отправляет fetch() на учебный API,
 // показывает ответ, ведёт журнал (Console) и получает результат проверки задания.
 document.addEventListener("alpine:init", function () {
+  // Поля мини-Postman, общие для всех в комнате (сервер принимает только их).
+  var SHARED_FIELDS = [
+    "method", "url", "params", "headers", "bodyMode", "body",
+    "tab", "respTab", "openedLog", "sending", "response", "log", "history", "consoleOpenedAt",
+  ];
+  var DEFAULTS = {
+    method: function () { return "GET"; },
+    url: function () { return window.location.origin + "/api/echo"; },
+    params: function () { return [{ key: "", value: "" }]; },
+    headers: function () { return [{ key: "", value: "" }]; },
+    bodyMode: function () { return "none"; },
+    body: function () { return ""; },
+    tab: function () { return "params"; },
+    respTab: function () { return "body"; },
+    openedLog: function () { return null; },
+    sending: function () { return false; },
+    response: function () { return null; },
+    log: function () { return []; },
+    history: function () { return {}; },
+    consoleOpenedAt: function () { return {}; },
+  };
   var HEADER_NAMES = ["Content-Type", "Accept", "Authorization", "X-Debug-Source", "Cache-Control"];
   var MAX_LOG = 10;
 
@@ -9,10 +30,11 @@ document.addEventListener("alpine:init", function () {
     title: "",
     expected: null,
     passed: {},
-    select: function (id, title, expected) {
+    select: function (id, title, expected, fromRemote) {
       this.id = id;
       this.title = title;
       this.expected = expected;
+      if (!fromRemote && window.Collab) window.Collab.local("taskId", id);
       window.dispatchEvent(new CustomEvent("task-selected", { detail: { id: id } }));
       var el = document.getElementById("builder");
       if (el && window.innerWidth < 1024) el.scrollIntoView({ behavior: "smooth" });
@@ -59,6 +81,46 @@ document.addEventListener("alpine:init", function () {
         window.addEventListener("task-selected", function () {
           self.validation = null;
           self.bad = {};
+          self.$nextTick(function () { self.evaluate(true); });
+        });
+        this.initCollab();
+      },
+
+      // ---------- Совместная работа: общий мини-Postman в комнате ----------
+      initCollab: function () {
+        var C = window.Collab;
+        if (!C) return;
+        var self = this;
+        SHARED_FIELDS.forEach(function (f) {
+          self.$watch(f, function (v) { C.local(f, JSON.parse(JSON.stringify(v === undefined ? null : v))); });
+        });
+        C.onPatch(function (field, value) { self.applyRemote(field, value); });
+      },
+
+      applyRemote: function (field, value) {
+        if (field === "taskId") {
+          var info = (window.TASKS || {})[value];
+          var store = Alpine.store("task");
+          if (info) store.select(value, info.title, info.expected, true);
+          else if (value === null) store.select(null, "", null, true);
+          return;
+        }
+        if (SHARED_FIELDS.indexOf(field) === -1) return;
+        // Сохраняем каретку, если пользователь сейчас печатает в поле.
+        var active = document.activeElement;
+        var hasCaret = active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA");
+        var start = hasCaret ? active.selectionStart : null;
+        var end = hasCaret ? active.selectionEnd : null;
+        this[field] = value === null || value === undefined ? DEFAULTS[field]() : JSON.parse(JSON.stringify(value));
+        var self = this;
+        this.$nextTick(function () {
+          if (hasCaret && document.activeElement === active && start !== null) {
+            try {
+              active.setSelectionRange(Math.min(start, active.value.length), Math.min(end, active.value.length));
+            } catch (e) { /* поле без выделения */ }
+          }
+          if (field === "history" || field === "consoleOpenedAt") self.evaluate(true);
+          if (field === "response" || field === "history") self.bad = self.bad || {};
         });
       },
 
@@ -206,10 +268,12 @@ document.addEventListener("alpine:init", function () {
         var list = this.history[task.id] || (this.history[task.id] = []);
         list.push(response);
         if (list.length > 20) list.shift();
-        this.evaluate();
+        this.evaluate(false);
       },
 
-      evaluate: function () {
+      // fromRemote = true: изменение пришло от другого участника комнаты.
+      // Результат считаем у всех одинаково, а засчитывает задание тот, кто сделал действие.
+      evaluate: function (fromRemote) {
         var task = Alpine.store("task");
         var list = this.history[task.id] || [];
         if (!task.id || !task.expected || !list.length) return;
@@ -223,7 +287,7 @@ document.addEventListener("alpine:init", function () {
         v.results.forEach(function (r) { if (!r.ok) bad[self.fieldOf(r.path)] = true; });
         if (v.waitingConsole) bad.console = true;
         this.bad = bad;
-        if (v.passed && !task.passed[task.id]) this.complete(task.id, list);
+        if (v.passed && !task.passed[task.id] && !fromRemote) this.complete(task.id, list);
       },
 
       // Какую часть мини-Postman подсветить по пути в ответе.
@@ -254,7 +318,7 @@ document.addEventListener("alpine:init", function () {
         var task = Alpine.store("task");
         if (!task.id) return;
         this.consoleOpenedAt[task.id] = (this.history[task.id] || []).length;
-        this.evaluate();
+        this.evaluate(false);
       },
 
       // ---------- Helpers for templates ----------

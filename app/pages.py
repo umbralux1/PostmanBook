@@ -8,7 +8,9 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from markupsafe import Markup
+from sqlmodel import Session
 
+from app.api.rooms import room_info
 from app.config import BASE_DIR, get_settings
 from app.dependencies import RequiredUserDep, SessionDep
 from app.errors import ApiError
@@ -21,7 +23,7 @@ from app.i18n import (
     normalize_lang,
     translate,
 )
-from app.models import Attempt, Chapter, Task
+from app.models import Attempt, Chapter, Task, User
 from app.services.localize import chapter_view, task_view
 from app.services.progress import passed_task_ids, quiz_task_id
 from app.services.task_loader import list_chapters, list_tasks
@@ -85,8 +87,14 @@ templates.env.globals["task_kind"] = task_kind
 router = APIRouter(include_in_schema=False)
 
 
-def render(request: Request, name: str, context: dict[str, Any]) -> HTMLResponse:
-    """TemplateResponse + язык: lang, _(), каталог для JS, список языков."""
+def render(
+    request: Request,
+    name: str,
+    context: dict[str, Any],
+    session: Session | None = None,
+    user: User | None = None,
+) -> HTMLResponse:
+    """TemplateResponse + язык (lang, _(), каталог для JS) + комната пользователя."""
     lang = get_lang(request)
 
     def _(text: str, **params: Any) -> str:
@@ -97,6 +105,7 @@ def render(request: Request, name: str, context: dict[str, Any]) -> HTMLResponse
         "_": _,
         "languages": LANGUAGES,
         "js_catalog": catalog(lang),
+        "room": room_info(session, user) if session is not None and user is not None else None,
         **context,
     }
     return templates.TemplateResponse(request, name, ctx)
@@ -151,7 +160,7 @@ def index(request: Request, session: SessionDep, user: RequiredUserDep) -> HTMLR
                 "quiz_passed": quiz_task_id(ch.id) in passed,
             }
         )
-    return render(request, "index.html", {"chapters": chapters})
+    return render(request, "index.html", {"chapters": chapters}, session, user)
 
 
 @router.get("/chapters/{chapter_id}", response_class=HTMLResponse)
@@ -173,7 +182,11 @@ def chapter_page(
             "done": sum(1 for t in tasks if t.id in passed),
             "quiz": ch.meta.get("quiz", []),
             "quiz_passed": quiz_task_id(ch.id) in passed,
+            # Для комнаты: по id задания (пришедшему от другого участника) найти его на своём языке.
+            "tasks_js": {t.id: {"title": t.title, "expected": t.expected} for t in tasks},
         },
+        session,
+        user,
     )
 
 
@@ -241,12 +254,16 @@ def _task_or_404(session: SessionDep, task_id: str, request: Request) -> Any:
 
 
 @router.get("/tasks/{task_id}/phase2", response_class=HTMLResponse)
-def phase2_page(task_id: str, request: Request, session: SessionDep) -> HTMLResponse:
+def phase2_page(
+    task_id: str, request: Request, session: SessionDep, user: RequiredUserDep
+) -> HTMLResponse:
     task = _task_or_404(session, task_id, request)
-    return render(request, "phases/phase2_wait.html", {"task": task})
+    return render(request, "phases/phase2_wait.html", {"task": task}, session, user)
 
 
 @router.get("/tasks/{task_id}/phase3", response_class=HTMLResponse)
-def phase3_page(task_id: str, request: Request, session: SessionDep) -> HTMLResponse:
+def phase3_page(
+    task_id: str, request: Request, session: SessionDep, user: RequiredUserDep
+) -> HTMLResponse:
     task = _task_or_404(session, task_id, request)
-    return render(request, "phases/phase3_paste.html", {"task": task})
+    return render(request, "phases/phase3_paste.html", {"task": task}, session, user)

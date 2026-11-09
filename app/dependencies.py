@@ -44,6 +44,10 @@ def get_or_create_user(session: Session, token: str) -> User:
         session.add(user)
         session.commit()
         session.refresh(user)
+    if user.room_id is None:
+        from app.services.rooms import ensure_room
+
+        ensure_room(session, user)
     return user
 
 

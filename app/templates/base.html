@@ -13,6 +13,11 @@
   <script src="{{ url_for('static', path='js/json-highlight.js') }}"></script>
   <script src="{{ url_for('static', path='js/checker.js') }}"></script>
   <script src="{{ url_for('static', path='js/builder.js') }}"></script>
+  {% if room %}
+  <script>window.ROOM = {{ room | tojson }};</script>
+  <script src="{{ url_for('static', path='js/collab.js') }}"></script>
+  {% endif %}
+  {% block head %}{% endblock %}
   <script src="{{ url_for('static', path='js/vendor/alpine.min.js') }}" defer></script>
 </head>
 <body class="bg-slate-50 text-slate-800 antialiased">
@@ -24,6 +29,7 @@
       </a>
       <div class="flex items-center gap-3 text-sm">
         {% block header_right %}{% endblock %}
+        {% if room %}{% include "components/room_widget.html" %}{% endif %}
         <nav class="flex rounded-md border border-slate-200 text-xs font-semibold overflow-hidden" aria-label="{{ _('Язык') }}">
           {% for code in languages %}
           <a href="/lang/{{ code }}?next={{ request.url.path | urlencode }}"
@@ -40,5 +46,6 @@
   <footer class="max-w-7xl mx-auto px-4 py-8 text-xs text-slate-400">
     {{ _("Учебная песочница. Не отправляйте сюда реальные токены и данные с production.") }}
   </footer>
+  {% if room %}{% include "components/name_dialog.html" %}{% endif %}
 </body>
 </html>

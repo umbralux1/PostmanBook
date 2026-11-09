@@ -35,3 +35,14 @@
 .prose-trainer details summary { cursor: pointer; font-weight: 600; color: #047857; }
 .prose-trainer details[open] summary { margin-bottom: .3rem; }
 .prose-trainer details p, .prose-trainer details li { color: #14532d; }
+
+/* ---------- Совместная работа: чужие курсоры, клики, выделения ---------- */
+.collab-overlay { position: fixed; inset: 0; pointer-events: none; z-index: 55; overflow: hidden; }
+.collab-cursor { position: fixed; left: 0; top: 0; will-change: transform; transition: transform 60ms linear; }
+.collab-cursor svg { display: block; filter: drop-shadow(0 1px 1px rgba(0,0,0,.25)); }
+.collab-label { position: absolute; left: 14px; top: 16px; white-space: nowrap; color: #fff;
+  font-size: 11px; font-weight: 600; line-height: 1; padding: 3px 6px; border-radius: 6px; }
+.collab-sel { position: fixed; border-radius: 2px; }
+.collab-ripple { position: fixed; width: 10px; height: 10px; margin: -5px 0 0 -5px; border: 2px solid;
+  border-radius: 999px; animation: collab-ripple .7s ease-out forwards; }
+@keyframes collab-ripple { to { transform: scale(4); opacity: 0; } }
