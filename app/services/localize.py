@@ -8,7 +8,7 @@
 from types import SimpleNamespace
 from typing import Any
 
-from app.i18n import DEFAULT_LANG
+from app.i18n import SOURCE_LANG
 from app.models import Chapter, Task
 
 BASE_URL_TOKEN = "{{BASE_URL}}"
@@ -26,7 +26,7 @@ def fill_base_url(value: Any, base_url: str) -> Any:
 
 
 def chapter_view(ch: Chapter, lang: str, base_url: str = "") -> Any:
-    tr: dict[str, Any] = ch.translations.get(lang, {}) if lang != DEFAULT_LANG else {}
+    tr: dict[str, Any] = ch.translations.get(lang, {}) if lang != SOURCE_LANG else {}
     return SimpleNamespace(
         id=ch.id,
         order=ch.order,
@@ -34,12 +34,12 @@ def chapter_view(ch: Chapter, lang: str, base_url: str = "") -> Any:
         title=tr.get("title", ch.title),
         content_md=fill_base_url(tr.get("content_md", ch.content_md), base_url),
         meta=fill_base_url(tr.get("meta", ch.meta), base_url),
-        translated=bool(tr) or lang == DEFAULT_LANG,
+        translated=bool(tr) or lang == SOURCE_LANG,
     )
 
 
 def task_view(task: Task, lang: str, base_url: str = "") -> Any:
-    tr: dict[str, Any] = task.translations.get(lang, {}) if lang != DEFAULT_LANG else {}
+    tr: dict[str, Any] = task.translations.get(lang, {}) if lang != SOURCE_LANG else {}
     return SimpleNamespace(
         id=task.id,
         chapter_id=task.chapter_id,

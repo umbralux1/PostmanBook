@@ -37,18 +37,31 @@ def test_normalize_lang() -> None:
     assert normalize_lang("xx") is None
 
 
-async def test_default_is_russian(postman: AsyncClient) -> None:
+async def test_default_is_english(postman: AsyncClient) -> None:
+    r = await postman.get("/chapters/ch01")
+    assert '<html lang="en">' in r.text
+    assert "All chapters" in r.text
+    assert "HTTP basics and your first request in Postman" in r.text
+    # В <head> — каталог переводов с русскими ключами, а t('…') в Alpine-выражениях
+    # переводится в браузере. Всё остальное в <body> должно быть английским.
+    body = re.sub(r"\bt\('[^']*'", "", r.text.split("<body", 1)[1])
+    assert CYRILLIC.findall(body) == []
+
+
+async def test_switch_to_russian(postman: AsyncClient) -> None:
+    r = await postman.get("/lang/ru", params={"next": "/chapters/ch01"})
+    assert r.status_code == 303
+    assert r.headers["location"] == "/chapters/ch01"
+    assert "lang=ru" in r.headers["set-cookie"]
+    postman.cookies.set("lang", "ru")
     r = await postman.get("/chapters/ch01")
     assert '<html lang="ru">' in r.text
     assert "Все главы" in r.text
     assert "HTTP-минимум" in r.text
+    assert "Первый GET-запрос" in r.text
 
 
-async def test_switch_to_english(postman: AsyncClient) -> None:
-    r = await postman.get("/lang/en", params={"next": "/chapters/ch01"})
-    assert r.status_code == 303
-    assert r.headers["location"] == "/chapters/ch01"
-    assert "lang=en" in r.headers["set-cookie"]
+async def test_english_content(postman: AsyncClient) -> None:
     postman.cookies.set("lang", "en")
     r = await postman.get("/chapters/ch01")
     assert '<html lang="en">' in r.text
@@ -62,8 +75,8 @@ async def test_switch_to_english(postman: AsyncClient) -> None:
 
 
 async def test_browser_language_does_not_switch_site(postman: AsyncClient) -> None:
-    r = await postman.get("/", headers={"Accept-Language": "en-US,en;q=0.9"})
-    assert "Учимся диагностировать" in r.text
+    r = await postman.get("/", headers={"Accept-Language": "ru-RU,ru;q=0.9"})
+    assert "Learn to diagnose API problems" in r.text
 
 
 @pytest.mark.parametrize("target", ["https://evil.example", "//evil.example", "evil", None])
@@ -73,9 +86,9 @@ async def test_lang_switch_has_no_open_redirect(postman: AsyncClient, target: st
     assert r.headers["location"] == "/"
 
 
-async def test_unknown_language_falls_back_to_russian(postman: AsyncClient) -> None:
+async def test_unknown_language_falls_back_to_english(postman: AsyncClient) -> None:
     r = await postman.get("/lang/xx")
-    assert "lang=ru" in r.headers["set-cookie"]
+    assert "lang=en" in r.headers["set-cookie"]
 
 
 async def test_api_errors_are_translated(postman: AsyncClient) -> None:
@@ -98,8 +111,13 @@ async def test_api_errors_are_translated(postman: AsyncClient) -> None:
     assert r.json()["error"] == "invalid_json"
 
 
-async def test_api_errors_russian_by_default(postman: AsyncClient) -> None:
+async def test_api_errors_english_by_default(postman: AsyncClient) -> None:
     r = await postman.get("/api/tickets/999")
+    assert r.json()["message"] == "Ticket 999 not found."
+
+
+async def test_api_errors_in_russian_when_chosen(postman: AsyncClient) -> None:
+    r = await postman.get("/api/tickets/999", cookies={"lang": "ru"})
     assert r.json()["message"] == "Заявка 999 не найдена."
 
 

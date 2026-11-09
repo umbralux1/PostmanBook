@@ -95,8 +95,8 @@ async def test_pages_render_and_set_cookie(postman: AsyncClient) -> None:
     assert "httponly" in r.headers["set-cookie"].lower()
     r = await postman.get("/chapters/ch01")
     assert r.status_code == 200
-    assert "Мини-Postman" in r.text
-    assert "Первый POST с JSON" in r.text
+    assert "Mini-Postman" in r.text
+    assert "Your first POST with JSON" in r.text
 
 
 async def test_api_does_not_issue_cookie(postman: AsyncClient) -> None:
@@ -109,8 +109,8 @@ async def test_quiz_submission(client: AsyncClient) -> None:
         "/chapters/ch01/quiz", data={"q1": "B", "q2": "C", "q3": "C", "q4": "B", "q5": "D"}
     )
     assert r.status_code == 200
-    assert "5 из 5" in r.text
+    assert "5 of 5" in r.text
     r = await client.post(
         "/chapters/ch01/quiz", data={"q1": "A", "q2": "C", "q3": "C", "q4": "B", "q5": "D"}
     )
-    assert "4 из 5" in r.text
+    assert "4 of 5" in r.text

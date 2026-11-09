@@ -1,18 +1,99 @@
 """Комнаты: личная комната, приглашение, имя, WebSocket, общий зачёт заданий."""
 
 import json
+import socket
+import threading
+import time
 from collections.abc import Iterator
+from pathlib import Path
 from typing import Any
 
+import httpx
 import pytest
+import uvicorn
 from sqlmodel import Session, select
-from starlette.testclient import TestClient, WebSocketTestSession
+from starlette.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
+from websockets.sync.client import connect as ws_connect
 
+from app.config import get_settings
+from app.db import create_tables, make_engine, set_engine
 from app.dependencies import SESSION_COOKIE
 from app.main import app
 from app.models import Room, User
 from app.services.room_hub import RATE_BURST, RoomHub
+from app.services.task_loader import sync_content
+
+# ---------- Настоящий сервер для сценариев с несколькими участниками ----------
+# TestClient запускает каждое WebSocket-подключение в своём потоке и event loop,
+# поэтому рассылки между участниками в нём ненадёжны. В бою loop один (uvicorn),
+# так что многопользовательские сценарии проверяем на живом uvicorn.
+
+
+class LiveServer:
+    def __init__(self, base: str) -> None:
+        self.base = base
+        self.ws_base = base.replace("http://", "ws://")
+
+
+@pytest.fixture
+def live(tmp_path: Path) -> Iterator[LiveServer]:
+    engine = make_engine(f"sqlite:///{tmp_path / 'live.db'}")
+    set_engine(engine)
+    create_tables(engine)
+    with Session(engine) as s:
+        sync_content(s, get_settings().content_dir)
+    sock = socket.socket()
+    sock.bind(("127.0.0.1", 0))
+    port = sock.getsockname()[1]
+    sock.close()
+    server = uvicorn.Server(
+        uvicorn.Config(app, host="127.0.0.1", port=port, log_level="warning", ws="websockets")
+    )
+    thread = threading.Thread(target=server.run, daemon=True)
+    thread.start()
+    deadline = time.monotonic() + 10
+    while not server.started:
+        if time.monotonic() > deadline:
+            raise RuntimeError("live server did not start")
+        time.sleep(0.02)
+    try:
+        yield LiveServer(f"http://127.0.0.1:{port}")
+    finally:
+        server.should_exit = True
+        thread.join(5)
+        engine.dispose()
+
+
+class Member:
+    """Участник: HTTP-клиент с cookie + WebSocket комнаты."""
+
+    def __init__(self, live: LiveServer, token: str) -> None:
+        self.live = live
+        self.token = token
+        self.http = httpx.Client(base_url=live.base, cookies={SESSION_COOKIE: token})
+        self.http.get("/")
+
+    def room(self) -> dict[str, Any]:
+        data: dict[str, Any] = self.http.get("/api/room").json()
+        return data
+
+    def connect(self, code: str) -> Any:
+        return ws_connect(
+            f"{self.live.ws_base}/ws/rooms/{code}",
+            additional_headers={"Cookie": f"{SESSION_COOKIE}={self.token}"},
+            proxy=None,
+            open_timeout=5,
+        )
+
+
+def recv(ws: Any, kind: str, where: Any = None, limit: int = 20) -> dict[str, Any]:
+    """Дождаться сообщения нужного типа (таймаут — тест не зависает)."""
+    for _ in range(limit):
+        msg: dict[str, Any] = json.loads(ws.recv(timeout=5))
+        if msg["type"] == kind and (where is None or where(msg)):
+            return msg
+    raise AssertionError(f"не дождались {kind}")
 
 
 def make_client(token: str) -> TestClient:
@@ -38,20 +119,6 @@ def bob(engine: object) -> Iterator[TestClient]:
 def room_of(c: TestClient) -> dict[str, Any]:
     data: dict[str, Any] = c.get("/api/room").json()
     return data
-
-
-def receive_type(
-    ws: WebSocketTestSession,
-    kind: str,
-    where: Any = None,
-    limit: int = 10,
-) -> dict[str, Any]:
-    """Дождаться сообщения нужного типа (и, если задано, условия where(msg))."""
-    for _ in range(limit):
-        msg: dict[str, Any] = ws.receive_json()
-        if msg["type"] == kind and (where is None or where(msg)):
-            return msg
-    raise AssertionError(f"не дождались {kind}")
 
 
 def names(msg: dict[str, Any]) -> list[str]:
@@ -111,30 +178,32 @@ def test_ws_rejects_foreign_origin(alice: TestClient) -> None:
     assert exc.value.code == 4403
 
 
-def test_ws_presence_patch_and_relay(alice: TestClient, bob: TestClient) -> None:
-    alice.post("/api/me", json={"name": "Аня"})
-    bob.post("/api/me", json={"name": "Борис"})
-    code = room_of(alice)["code"]
-    bob.get(f"/join/{code}")
+def test_ws_presence_patch_and_relay(live: LiveServer) -> None:
+    alice, bob = Member(live, "alice-session-token-1"), Member(live, "bob-session-token-0002")
+    alice.http.post("/api/me", json={"name": "Аня"})
+    bob.http.post("/api/me", json={"name": "Борис"})
+    code = alice.room()["code"]
+    bob.http.get(f"/join/{code}")
 
-    with alice.websocket_connect(f"/ws/rooms/{code}") as wa:
-        welcome = wa.receive_json()
-        assert welcome["type"] == "welcome" and welcome["state"] == {}
-        wa.send_text(json.dumps({"type": "patch", "field": "url", "value": "http://x/api/echo"}))
+    with alice.connect(code) as wa:
+        welcome = recv(wa, "welcome")
+        assert welcome["state"] == {}
+        wa.send(json.dumps({"type": "patch", "field": "url", "value": "http://x/api/echo"}))
+        time.sleep(0.1)  # патч дошёл до сервера раньше, чем подключится Борис
 
-        with bob.websocket_connect(f"/ws/rooms/{code}") as wb:
-            wb_welcome = wb.receive_json()
+        with bob.connect(code) as wb:
+            wb_welcome = recv(wb, "welcome")
             # Новый участник сразу получает общее состояние.
             assert wb_welcome["state"] == {"url": "http://x/api/echo"}
             assert sorted(m["name"] for m in wb_welcome["presence"]) == ["Аня", "Борис"]
-            receive_type(wa, "presence", lambda m: len(m["members"]) == 2)
+            recv(wa, "presence", lambda m: len(m["members"]) == 2)
 
-            wb.send_text(json.dumps({"type": "patch", "field": "body", "value": '{"a": 1}'}))
-            patch = receive_type(wa, "patch")
+            wb.send(json.dumps({"type": "patch", "field": "body", "value": '{"a": 1}'}))
+            patch = recv(wa, "patch")
             assert patch["field"] == "body" and patch["value"] == '{"a": 1}'
             assert patch["from"] == wb_welcome["conn"]
 
-            wb.send_text(
+            wb.send(
                 json.dumps(
                     {
                         "type": "cursor",
@@ -146,35 +215,32 @@ def test_ws_presence_patch_and_relay(alice: TestClient, bob: TestClient) -> None
                     }
                 )
             )
-            cur = receive_type(wa, "cursor")
+            cur = recv(wa, "cursor")
             assert cur["rx"] == 0.5 and cur["path"] == [1, 2] and "secret" not in cur
 
             # Чужие поля и мусор игнорируются.
-            wb.send_text(json.dumps({"type": "patch", "field": "__proto__", "value": 1}))
-            wb.send_text("не json")
-            wb.send_text(json.dumps({"type": "click", "page": "/", "path": [0], "rx": 0, "ry": 0}))
-            assert receive_type(wa, "click")["path"] == [0]
+            wb.send(json.dumps({"type": "patch", "field": "__proto__", "value": 1}))
+            wb.send("не json")
+            wb.send(json.dumps({"type": "click", "page": "/", "path": [0], "rx": 0, "ry": 0}))
+            assert recv(wa, "click")["path"] == [0]
 
         # Борис ушёл — Аня видит, что он пропал (его курсор фронт убирает по списку).
-        receive_type(wa, "presence", lambda m: names(m) == ["Аня"])
+        recv(wa, "presence", lambda m: names(m) == ["Аня"])
 
 
-def test_task_completion_is_credited_to_everyone_online(
-    alice: TestClient, bob: TestClient, session: Session
-) -> None:
-    code = room_of(alice)["code"]
-    bob.get(f"/join/{code}")
-    with (
-        alice.websocket_connect(f"/ws/rooms/{code}") as wa,
-        bob.websocket_connect(f"/ws/rooms/{code}") as wb,
-    ):
-        wa.receive_json()
-        wb.receive_json()
-        r = alice.post("/api/tasks/ch01-task1/complete", json={"responses": []})
+def test_task_completion_is_credited_to_everyone_online(live: LiveServer) -> None:
+    alice, bob = Member(live, "alice-session-token-1"), Member(live, "bob-session-token-0002")
+    code = alice.room()["code"]
+    bob.http.get(f"/join/{code}")
+    with alice.connect(code) as wa, bob.connect(code) as wb:
+        recv(wa, "welcome")
+        recv(wb, "welcome")
+        recv(wa, "presence", lambda m: len(m["members"]) == 2)
+        r = alice.http.post("/api/tasks/ch01-task1/complete", json={"responses": []})
         assert r.json()["credited"] == 2
-        assert receive_type(wb, "task_completed")["task_id"] == "ch01-task1"
-    assert bob.get("/api/progress").json()["ch01"]["ch01-task1"] is True
-    assert alice.get("/api/progress").json()["ch01"]["ch01-task1"] is True
+        assert recv(wb, "task_completed")["task_id"] == "ch01-task1"
+    assert bob.http.get("/api/progress").json()["ch01"]["ch01-task1"] is True
+    assert alice.http.get("/api/progress").json()["ch01"]["ch01-task1"] is True
 
 
 def test_offline_members_are_not_credited(alice: TestClient, bob: TestClient) -> None:
@@ -185,12 +251,13 @@ def test_offline_members_are_not_credited(alice: TestClient, bob: TestClient) ->
     assert bob.get("/api/progress").json()["ch01"]["ch01-task1"] is False
 
 
-def test_rename_updates_presence(alice: TestClient) -> None:
-    code = room_of(alice)["code"]
-    with alice.websocket_connect(f"/ws/rooms/{code}") as wa:
-        assert wa.receive_json()["presence"][0]["name"] == ""  # «Гость» подставляет фронт
-        alice.post("/api/me", json={"name": "Аня"})
-        receive_type(wa, "presence", lambda m: names(m) == ["Аня"])
+def test_rename_updates_presence(live: LiveServer) -> None:
+    alice = Member(live, "alice-session-token-1")
+    code = alice.room()["code"]
+    with alice.connect(code) as wa:
+        assert recv(wa, "welcome")["presence"][0]["name"] == ""  # «Гость» подставляет фронт
+        alice.http.post("/api/me", json={"name": "Аня"})
+        recv(wa, "presence", lambda m: names(m) == ["Аня"])
 
 
 def test_existing_user_without_room_gets_one(engine: object, session: Session) -> None:

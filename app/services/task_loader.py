@@ -12,7 +12,7 @@ import yaml
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from sqlmodel import Session, select
 
-from app.i18n import DEFAULT_LANG, LANGUAGES
+from app.i18n import LANGUAGES, SOURCE_LANG
 from app.models import Chapter, Task
 
 log = logging.getLogger("trainer.content")
@@ -144,7 +144,7 @@ def _files(content_dir: Path, kind: str) -> tuple[list[Path], dict[str, list[Pat
         if lang is None:
             base.append(p)
         else:
-            if lang not in LANGUAGES or lang == DEFAULT_LANG:
+            if lang not in LANGUAGES or lang == SOURCE_LANG:
                 raise ValueError(f"{p.name}: неизвестный язык перевода {lang!r}")
             translated.setdefault(lang, []).append(p)
     return base, translated
