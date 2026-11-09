@@ -155,8 +155,7 @@ def test_ws_presence_patch_and_relay(alice: TestClient, bob: TestClient) -> None
             wb.send_text(json.dumps({"type": "click", "page": "/", "path": [0], "rx": 0, "ry": 0}))
             assert receive_type(wa, "click")["path"] == [0]
 
-        # Борис ушёл — Аня видит, что он пропал.
-        assert receive_type(wa, "cursor_leave")["from"] == wb_welcome["conn"]
+        # Борис ушёл — Аня видит, что он пропал (его курсор фронт убирает по списку).
         receive_type(wa, "presence", lambda m: names(m) == ["Аня"])
 
 

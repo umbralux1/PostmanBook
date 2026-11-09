@@ -1,23 +1,27 @@
-# Render Blueprint: веб-сервис из Dockerfile + Postgres.
-# Render → New → Blueprint → выберите репозиторий; дальше всё создастся само.
+# Render Blueprint: веб-сервис из Dockerfile, база — файл SQLite.
+# Render → New → Blueprint → выберите репозиторий.
 services:
   - type: web
     name: http-trainer
     runtime: docker
-    plan: free            # free засыпает через 15 мин без запросов; starter — нет
     healthCheckPath: /healthz
+
+    # ВНИМАНИЕ: на бесплатном плане файловая система временная — файл базы
+    # (прогресс учеников, комнаты, имена) удаляется при каждом деплое,
+    # перезапуске и засыпании сервиса (через 15 минут без запросов).
+    plan: free
+
+    # Чтобы данные сохранялись, нужен постоянный диск (только платные планы).
+    # Раскомментируйте эти строки и строку TRAINER_PERSISTENT_DISK ниже:
+    # plan: starter
+    # disk:
+    #   name: trainer-data
+    #   mountPath: /srv/data
+    #   sizeGB: 1
+
     envVars:
-      - key: TRAINER_DATABASE_URL
-        fromDatabase:
-          name: http-trainer-db
-          property: connectionString
-      # Миграции применяет команда запуска контейнера (alembic upgrade head).
-      - key: TRAINER_AUTO_CREATE_TABLES
-        value: "false"
       # Сайт работает только по HTTPS — cookie тоже только по HTTPS.
       - key: TRAINER_COOKIE_SECURE
         value: "true"
-
-databases:
-  - name: http-trainer-db
-    plan: free            # бесплатная база Render удаляется через 30 дней — для курса возьмите платный план
+      # - key: TRAINER_PERSISTENT_DISK
+      #   value: "true"

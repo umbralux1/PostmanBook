@@ -18,8 +18,9 @@ cp .env.example .env        # необязательно
 docker compose up --build
 ```
 
-Откройте http://localhost:8000. Поднимутся PostgreSQL и приложение. Миграции
-(Alembic) применяются при старте контейнера, контент загружается из YAML.
+Откройте http://localhost:8000. База — файл SQLite в томе Docker `trainer-data`, он
+переживает пересборку и перезапуск контейнера. Миграции (Alembic) применяются при
+старте, контент загружается из YAML.
 
 ### Локально (SQLite)
 
@@ -38,7 +39,6 @@ uvicorn app.main:app --reload
 
 ```bash
 pytest                 # тесты (in-memory SQLite, без моков)
-TRAINER_TEST_DATABASE_URL=postgres://user@localhost:5432/test_db pytest   # те же тесты на Postgres
 node --test tests/js/*.test.cjs   # unit-тесты проверки ответов (нужен Node.js 18+)
 ruff check . && ruff format --check .
 mypy app               # strict
@@ -288,58 +288,64 @@ app/content/tasks/ch01.en.yaml
 
 ## Развёртывание на Render
 
-В репозитории есть `render.yaml` (Blueprint): веб-сервис из `Dockerfile` и база Postgres.
+В репозитории есть `render.yaml` (Blueprint): веб-сервис из `Dockerfile`, база —
+файл SQLite в `/srv/data/trainer.db`.
 
 1. Запушьте репозиторий на GitHub или GitLab.
-2. Render → **New → Blueprint** → выберите репозиторий → **Apply**.
+2. Render → **New → Blueprint** → выберите репозиторий → **Apply**. Если сервис уже
+   создан через New → Web Service, Blueprint не нужен: настройки ниже подходят и ему.
 3. Через несколько минут сайт будет доступен на `https://<имя>.onrender.com`.
+
+**Важно про данные.** На бесплатном плане файловая система Render временная: файл базы
+(прогресс, комнаты, имена участников) удаляется при каждом деплое, перезапуске и
+засыпании сервиса, а засыпает он через 15 минут без запросов. Для демонстрации этого
+хватает. Чтобы прогресс сохранялся, нужен постоянный диск, он есть только на платных
+планах:
+
+- в `render.yaml` раскомментируйте `plan: starter`, блок `disk` (`mountPath: /srv/data`)
+  и переменную `TRAINER_PERSISTENT_DISK=true`;
+- или в Dashboard: сервис → **Disks** → **Add Disk**, Mount Path `/srv/data`; затем
+  **Environment** → `TRAINER_PERSISTENT_DISK=true`.
+
+Без диска приложение при старте пишет в лог предупреждение о временной базе.
 
 Что уже учтено:
 
 - **Адреса в заданиях.** Render принимает HTTPS и передаёт приложению обычный HTTP с
-  заголовком `X-Forwarded-Proto: https`. Dockerfile запускает uvicorn с
-  `--proxy-headers --forwarded-allow-ips='*'`, поэтому приложение видит `https://` и
-  подставляет в задания `https://<имя>.onrender.com/api/echo`. Без этих флагов в
-  заданиях оказался бы `http://…`, и мини-Postman на HTTPS-странице такой адрес бы не
-  отправил. Если запускаете не через Dockerfile, сохраните флаги в команде запуска.
+  заголовком `X-Forwarded-Proto: https`. Скрипт запуска (`docker/start.sh`) запускает
+  uvicorn с `--proxy-headers --forwarded-allow-ips='*'`, поэтому приложение видит
+  `https://` и подставляет в задания `https://<имя>.onrender.com/api/echo`. Без этих
+  флагов в заданиях оказался бы `http://…`, и мини-Postman на HTTPS-странице такой адрес
+  бы не отправил.
 - **Порт.** Приложение слушает `$PORT`, который задаёт Render (10000).
-- **База.** Файловая система Render временная, SQLite там теряется при каждом
-  перезапуске, поэтому используется Postgres. Строку подключения вида `postgres://…`
-  приложение само переводит на драйвер psycopg.
+- **Права на диск.** Диски монтируются с владельцем root. Скрипт запуска выдаёт папку
+  с базой пользователю `trainer` и только потом запускает приложение без прав root.
 - **WebSocket** (комнаты) работает на Render без настройки. Проверка `Origin` пропускает
-  только свой домен, свой домен в настройках Render тоже подойдёт.
-
-Ограничения бесплатного плана:
-
-- сервис засыпает через 15 минут без запросов и просыпается около минуты. Комнаты и
-  общее состояние мини-Postman при этом сбрасываются, прогресс остаётся в базе;
-- бесплатная база Postgres удаляется через 30 дней. Для настоящего курса выберите
-  платный план базы в `render.yaml`.
+  только свой домен.
+- **Один процесс.** SQLite, комнаты и rate limit рассчитаны на один экземпляр сервиса,
+  как и есть на Render. Не включайте несколько экземпляров (scaling).
 
 После первого деплоя откройте главу 1 и убедитесь, что в задании 1 адрес начинается с
 `https://` и с вашего домена.
 
-**Если сервис создан не через Blueprint** (New → Web Service), `render.yaml` не
-применяется: базы и переменных нет. При старте вы увидите ошибку
-«База данных не настроена». Исправление:
+**Резервная копия базы** (на сервисе с диском, Render → **Shell**):
 
-1. New → Postgres, создайте базу.
-2. Сервис → **Environment** → добавьте `TRAINER_DATABASE_URL` (или `DATABASE_URL`) со
-   значением **Internal Database URL** из страницы базы. Ещё добавьте
-   `TRAINER_COOKIE_SECURE=true` и `TRAINER_AUTO_CREATE_TABLES=false`.
-3. **Manual Deploy → Deploy latest commit**.
+```bash
+python -c "import sqlite3; s=sqlite3.connect('/srv/data/trainer.db'); s.backup(sqlite3.connect('/srv/data/backup.db'))"
+```
 
 ## Развёртывание на VPS
 
 1. Установите Docker и плагин compose (Ubuntu: `curl -fsSL https://get.docker.com | sh`).
 2. Склонируйте репозиторий и создайте `.env`:
    ```
-   POSTGRES_PASSWORD=<длинный случайный пароль>
    TRAINER_PUBLIC_BASE_URL=https://trainer.example.com
    TRAINER_CORS_ORIGINS=["https://trainer.example.com","*"]
    TRAINER_COOKIE_SECURE=true
+   TRAINER_PERSISTENT_DISK=true
    ```
-3. `docker compose up -d --build`.
+3. `docker compose up -d --build`. База лежит в томе `trainer-data`; копия:
+   `docker compose exec app python -c "import sqlite3; sqlite3.connect('/srv/data/trainer.db').backup(sqlite3.connect('/srv/data/backup.db'))"`.
 4. Поставьте перед приложением nginx или Caddy с HTTPS. Пример для Caddy:
    ```
    trainer.example.com {

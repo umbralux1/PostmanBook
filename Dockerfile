@@ -2,7 +2,10 @@ FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1
+    PIP_NO_CACHE_DIR=1 \
+    # База — файл SQLite в /srv/data. Эту папку монтируют как том (docker compose)
+    # или постоянный диск (Render), чтобы данные переживали перезапуск.
+    TRAINER_DATABASE_URL=sqlite:////srv/data/trainer.db
 
 WORKDIR /srv
 
@@ -15,19 +18,14 @@ RUN pip install -e .
 
 COPY alembic.ini ./
 COPY alembic ./alembic
+COPY docker/start.sh /usr/local/bin/start.sh
+RUN chmod +x /usr/local/bin/start.sh && mkdir -p /srv/data && chown -R trainer:trainer /srv
 
-# Приложение работает не от root: папка должна быть доступна пользователю trainer
-# (иначе SQLite без настроенной базы не сможет создать файл).
-RUN chown -R trainer:trainer /srv
-
-USER trainer
 EXPOSE 8000
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s \
   CMD python -c "import os, urllib.request; urllib.request.urlopen('http://127.0.0.1:%s/healthz' % os.environ.get('PORT', '8000'))" || exit 1
 
-# Миграции → запуск. Контент из YAML синхронизируется при старте приложения.
-# PORT задают хостинги (Render — 10000); локально и в docker compose — 8000.
-# --forwarded-allow-ips='*': доверять X-Forwarded-Proto от прокси хостинга, иначе
-# за HTTPS-прокси приложение решит, что оно на http://, и адреса в заданиях сломаются.
-CMD ["sh", "-c", "alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --proxy-headers --forwarded-allow-ips='*'"]
+# Скрипт стартует от root только чтобы выдать права на папку с базой,
+# затем сразу понижает права до пользователя trainer.
+CMD ["/usr/local/bin/start.sh"]

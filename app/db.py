@@ -2,23 +2,35 @@
 
 from collections.abc import Iterator
 from pathlib import Path
+from typing import Any
 
-from sqlalchemy import Engine, inspect
+from sqlalchemy import Engine, event, inspect
 from sqlalchemy.pool import StaticPool
 from sqlmodel import Session, SQLModel, create_engine
 
-from app.config import get_settings
+from app.config import get_settings, sqlite_path
 
 _engine: Engine | None = None
 
 
 def make_engine(url: str) -> Engine:
-    if url.startswith("sqlite"):
-        kwargs: dict[str, object] = {"connect_args": {"check_same_thread": False}}
-        if url in ("sqlite://", "sqlite:///:memory:"):
-            kwargs["poolclass"] = StaticPool
-        return create_engine(url, **kwargs)
-    return create_engine(url, pool_pre_ping=True)
+    """Движок SQLite: файл (папка создаётся сама) или база в памяти для тестов."""
+    path = sqlite_path(url)
+    if path is None:
+        return create_engine(url, connect_args={"check_same_thread": False}, poolclass=StaticPool)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    engine = create_engine(url, connect_args={"check_same_thread": False, "timeout": 15})
+
+    @event.listens_for(engine, "connect")
+    def _sqlite_pragmas(dbapi_conn: Any, _: Any) -> None:
+        cur = dbapi_conn.cursor()
+        # WAL: чтение не блокирует запись — важно, когда учеников много одновременно.
+        cur.execute("PRAGMA journal_mode=WAL")
+        cur.execute("PRAGMA synchronous=NORMAL")
+        cur.execute("PRAGMA foreign_keys=ON")
+        cur.close()
+
+    return engine
 
 
 def get_engine() -> Engine:

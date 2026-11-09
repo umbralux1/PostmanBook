@@ -6,29 +6,19 @@ os.environ.setdefault("TRAINER_RATE_LIMIT_ENABLED", "false")
 
 import pytest
 from httpx import ASGITransport, AsyncClient
-from sqlmodel import Session, SQLModel
+from sqlmodel import Session
 
-from app.config import Settings, get_settings
+from app.config import get_settings
 from app.db import create_tables, make_engine, set_engine
 from app.dependencies import SESSION_COOKIE, limiter
 from app.main import app
 from app.services.task_loader import sync_content
 
-# По умолчанию — SQLite в памяти. Чтобы прогнать тесты на Postgres (как на Render):
-#   TRAINER_TEST_DATABASE_URL=postgres://user@host:5432/db pytest
-TEST_DB_URL = Settings(
-    database_url=os.environ.get("TRAINER_TEST_DATABASE_URL", "sqlite://")
-).database_url
-
 
 @pytest.fixture
 def engine() -> Iterator[object]:
-    eng = make_engine(TEST_DB_URL)
+    eng = make_engine("sqlite://")  # SQLite в памяти, общий для всех соединений
     set_engine(eng)
-    if not TEST_DB_URL.startswith("sqlite"):
-        import app.models  # noqa: F401
-
-        SQLModel.metadata.drop_all(eng)  # чистая база на каждый тест
     create_tables(eng)
     with Session(eng) as s:
         sync_content(s, get_settings().content_dir)

@@ -4,7 +4,7 @@ import os
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import AliasChoices, Field, field_validator
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -15,11 +15,8 @@ class Settings(BaseSettings):
 
     app_name: str = "HTTP-тренажёр"
     debug: bool = False
-    # TRAINER_DATABASE_URL или стандартное DATABASE_URL (так его часто называют хостинги).
-    database_url: str = Field(
-        default="sqlite:///./trainer.db",
-        validation_alias=AliasChoices("TRAINER_DATABASE_URL", "DATABASE_URL", "database_url"),
-    )
+    # База — SQLite-файл. В Docker: /srv/data/trainer.db (папку можно смонтировать как том/диск).
+    database_url: str = "sqlite:///./trainer.db"
     # Готовить БД при старте: применить миграции Alembic (in-memory SQLite — create_all).
     # В Docker миграции запускаются отдельной командой перед стартом, здесь можно false.
     auto_create_tables: bool = True
@@ -35,35 +32,31 @@ class Settings(BaseSettings):
 
     @field_validator("database_url")
     @classmethod
-    def _postgres_driver(cls, url: str) -> str:
-        """Хостинги (Render, Heroku) выдают postgres://… или postgresql://… без драйвера.
-
-        SQLAlchemy по умолчанию взял бы psycopg2, которого нет в зависимостях, —
-        подставляем psycopg (v3).
-        """
-        for prefix in ("postgres://", "postgresql://"):
-            if url.startswith(prefix):
-                return "postgresql+psycopg://" + url[len(prefix) :]
+    def _only_sqlite(cls, url: str) -> str:
+        if not url.startswith("sqlite"):
+            raise ValueError(
+                "Проект работает на SQLite: TRAINER_DATABASE_URL должен начинаться с sqlite://, "
+                "например sqlite:////srv/data/trainer.db"
+            )
         return url
 
 
-class DatabaseNotConfiguredError(RuntimeError):
-    pass
+def sqlite_path(url: str) -> Path | None:
+    """Путь к файлу базы или None для базы в памяти."""
+    if url in ("sqlite://", "sqlite:///:memory:"):
+        return None
+    return Path(url.split("///", 1)[1]) if "///" in url else None
 
 
-def check_database_for_hosting(settings: Settings) -> None:
-    """На Render SQLite бесполезна: файловая система временная, данные теряются.
-
-    Вместо непонятной ошибки sqlite3 сразу говорим, что нужно настроить.
-    """
-    if os.environ.get("RENDER") and settings.database_url.startswith("sqlite"):
-        raise DatabaseNotConfiguredError(
-            "База данных не настроена. На Render задайте переменную TRAINER_DATABASE_URL "
-            "(или DATABASE_URL) = Internal Database URL вашей базы Postgres: "
-            "Dashboard → сервис → Environment. Проще всего создать сервис через "
-            "New → Blueprint: render.yaml создаст базу и переменную сам. "
-            "SQLite на Render не подходит — данные теряются при каждом перезапуске."
+def hosting_storage_warning(settings: Settings) -> str | None:
+    """На Render без постоянного диска файл базы живёт до перезапуска сервиса."""
+    if os.environ.get("RENDER") and not os.environ.get("TRAINER_PERSISTENT_DISK"):
+        return (
+            "SQLite на Render без постоянного диска: база удаляется при каждом деплое, "
+            "перезапуске и засыпании сервиса. Подключите диск к папке с базой "
+            f"({sqlite_path(settings.database_url)}) и задайте TRAINER_PERSISTENT_DISK=true."
         )
+    return None
 
 
 @lru_cache

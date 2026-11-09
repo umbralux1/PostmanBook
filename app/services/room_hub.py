@@ -132,13 +132,13 @@ class RoomHub:
         if room is None:
             return
         room.connections.pop(conn.id, None)
-        empty = not room.connections
-        if empty:
+        if not room.connections:
             # Общее состояние живёт, пока в комнате кто-то есть.
             self.rooms.pop(code, None)
-        else:
-            await self.broadcast(code, {"type": "cursor_leave", "from": conn.id})
-            await self.broadcast_presence(code)
+            return
+        # Одно сообщение: новый список участников (фронт сам убирает курсоры ушедших).
+        # shield — рассылка дойдёт, даже если задачу соединения отменяют (обрыв, остановка).
+        await asyncio.shield(self.broadcast_presence(code))
 
     # ---------- сообщения от клиента ----------
     async def handle(self, code: str, conn: Connection, raw: str) -> None:

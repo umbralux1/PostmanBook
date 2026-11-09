@@ -1,40 +1,53 @@
-import pytest
+import sqlite3
+from pathlib import Path
 
-from app.config import DatabaseNotConfiguredError, Settings, check_database_for_hosting
+import pytest
+from pydantic import ValidationError
+
+from app.config import Settings, hosting_storage_warning, sqlite_path
+from app.db import make_engine
+
+
+def test_default_is_sqlite_file() -> None:
+    assert Settings().database_url.startswith("sqlite")
+
+
+def test_non_sqlite_url_is_rejected() -> None:
+    with pytest.raises(ValidationError, match="SQLite"):
+        Settings(database_url="postgresql://u:p@h/db")
 
 
 @pytest.mark.parametrize(
-    ("given", "expected"),
+    ("url", "path"),
     [
-        ("postgres://u:p@host:5432/db", "postgresql+psycopg://u:p@host:5432/db"),
-        ("postgresql://u:p@host/db", "postgresql+psycopg://u:p@host/db"),
-        ("postgresql+psycopg://u:p@host/db", "postgresql+psycopg://u:p@host/db"),
-        ("sqlite:///./trainer.db", "sqlite:///./trainer.db"),
+        ("sqlite:///./trainer.db", Path("./trainer.db")),
+        ("sqlite:////srv/data/trainer.db", Path("/srv/data/trainer.db")),
+        ("sqlite://", None),
     ],
 )
-def test_database_url_gets_psycopg_driver(given: str, expected: str) -> None:
-    assert Settings(database_url=given).database_url == expected
+def test_sqlite_path(url: str, path: Path | None) -> None:
+    assert sqlite_path(url) == path
 
 
-def test_database_url_accepts_standard_name(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delenv("TRAINER_DATABASE_URL", raising=False)
-    monkeypatch.setenv("DATABASE_URL", "postgres://u:p@h/db")
-    assert Settings().database_url == "postgresql+psycopg://u:p@h/db"
+def test_file_engine_creates_folder_and_uses_wal(tmp_path: Path) -> None:
+    db = tmp_path / "nested" / "data" / "trainer.db"
+    engine = make_engine(f"sqlite:///{db}")
+    with engine.connect() as conn:
+        mode = conn.exec_driver_sql("PRAGMA journal_mode").scalar()
+        fk = conn.exec_driver_sql("PRAGMA foreign_keys").scalar()
+    assert db.parent.is_dir()
+    assert mode == "wal" and fk == 1
+    engine.dispose()
+    assert sqlite3.connect(db).execute("PRAGMA journal_mode").fetchone() == ("wal",)
 
 
-def test_trainer_variable_wins(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("DATABASE_URL", "postgres://u:p@h/other")
-    monkeypatch.setenv("TRAINER_DATABASE_URL", "postgres://u:p@h/db")
-    assert Settings().database_url.endswith("/db")
-
-
-def test_sqlite_on_render_gives_clear_error(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("RENDER", "true")
-    with pytest.raises(DatabaseNotConfiguredError, match="TRAINER_DATABASE_URL"):
-        check_database_for_hosting(Settings(database_url="sqlite:///./trainer.db"))
-    check_database_for_hosting(Settings(database_url="postgres://u:p@h/db"))  # ок
-
-
-def test_sqlite_locally_is_fine(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_render_warning_without_disk(monkeypatch: pytest.MonkeyPatch) -> None:
+    s = Settings(database_url="sqlite:////srv/data/trainer.db")
     monkeypatch.delenv("RENDER", raising=False)
-    check_database_for_hosting(Settings(database_url="sqlite:///./trainer.db"))
+    assert hosting_storage_warning(s) is None
+    monkeypatch.setenv("RENDER", "true")
+    monkeypatch.delenv("TRAINER_PERSISTENT_DISK", raising=False)
+    warning = hosting_storage_warning(s)
+    assert warning and "/srv/data/trainer.db" in warning
+    monkeypatch.setenv("TRAINER_PERSISTENT_DISK", "true")
+    assert hosting_storage_warning(s) is None
