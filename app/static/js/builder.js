@@ -4,8 +4,12 @@ document.addEventListener("alpine:init", function () {
   // Поля мини-Postman, общие для всех в комнате (сервер принимает только их).
   var SHARED_FIELDS = [
     "method", "url", "params", "headers", "bodyMode", "body",
-    "tab", "respTab", "openedLog", "sending", "response", "log", "history", "consoleOpenedAt",
+    "tab", "respTab", "respView", "openedLog", "sending", "response", "log", "history", "consoleOpenedAt",
   ];
+  // Цвета методов — как в Postman.
+  var METHOD_COLORS = {
+    GET: "#007f31", POST: "#ad7a03", PUT: "#0053b8", PATCH: "#623497", DELETE: "#8e1a10",
+  };
   var DEFAULTS = {
     method: function () { return "GET"; },
     url: function () { return window.location.origin + "/api/echo"; },
@@ -15,6 +19,7 @@ document.addEventListener("alpine:init", function () {
     body: function () { return ""; },
     tab: function () { return "params"; },
     respTab: function () { return "body"; },
+    respView: function () { return "pretty"; },
     openedLog: function () { return null; },
     sending: function () { return false; },
     response: function () { return null; },
@@ -65,6 +70,7 @@ document.addEventListener("alpine:init", function () {
       body: "",
       tab: "params",
       respTab: "body",
+      respView: "pretty",
       sending: false,
       error: null,
       response: null,
@@ -249,6 +255,7 @@ document.addEventListener("alpine:init", function () {
             headers: respHeaders,
           };
           entry.response = { status: res.status, headers: respHeaders, body: text };
+          entry.timeMs = timeMs;
           this.recordResponse(window.TaskChecker.normalizeResponse(res.status, respHeaders, text));
         } catch (e) {
           this.error = t("Запрос не ушёл: {reason}", { reason: e.message });
@@ -322,21 +329,38 @@ document.addEventListener("alpine:init", function () {
       },
 
       // ---------- Helpers for templates ----------
+      // Цвета как в Postman: 2xx зелёный, 3xx синий, 4xx/5xx красный.
       statusClass: function (code) {
-        if (code >= 200 && code < 300) return "bg-emerald-100 text-emerald-800";
-        if (code >= 300 && code < 400) return "bg-sky-100 text-sky-800";
-        if (code >= 400 && code < 500) return "bg-amber-100 text-amber-800";
-        return "bg-rose-100 text-rose-800";
+        if (code >= 200 && code < 300) return "pm-ok";
+        if (code >= 300 && code < 400) return "pm-redirect";
+        return "pm-fail";
+      },
+      methodColor: function (method) {
+        return METHOD_COLORS[method] || "#212121";
+      },
+      lineNumbers: function (text) {
+        var n = String(text || "").split("\n").length;
+        var out = [];
+        for (var i = 1; i <= n; i++) out.push(i);
+        return out.join("\n");
+      },
+      // Тело ответа в режиме Pretty: JSON с отступами, иначе как есть.
+      prettyText: function (text) {
+        if (text == null || text === "") return "";
+        try { return JSON.stringify(JSON.parse(text), null, 2); } catch (e) { return String(text); }
       },
       pretty: function (text) {
-        if (text == null || text === "") return '<span class="text-slate-400">' + window.escapeHtml(t("(пусто)")) + "</span>";
+        if (text == null || text === "") return '<span style="color:#a6a6a6">' + window.escapeHtml(t("(пусто)")) + "</span>";
         try { return window.highlightJson(JSON.parse(text)); } catch (e) { return window.escapeHtml(text); }
       },
       prettyHeaders: function (obj) {
         return window.highlightJson(obj);
       },
+      formatSize: function (bytes) {
+        return bytes < 1024 ? bytes + " B" : (bytes / 1024).toFixed(2) + " KB";
+      },
       ring: function (field) {
-        return this.bad[field] ? "ring-2 ring-rose-400" : "";
+        return this.bad[field] ? "is-bad" : "";
       },
     };
   });

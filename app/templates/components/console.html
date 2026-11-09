@@ -1,34 +1,28 @@
+{# Console — журнал запросов, как Postman Console. #}
 <div>
-  <p class="text-xs text-slate-500 mb-2">{{ _("Журнал последних 10 запросов: что ушло на сервер и что пришло в ответ — «как есть».") }}</p>
+  <p class="pm-section-title">{{ _("Журнал последних 10 запросов: что ушло на сервер и что пришло в ответ — «как есть».") }}</p>
   <template x-if="!log.length">
-    <p class="text-sm text-slate-400">{{ _("Пока пусто. Отправь запрос.") }}</p>
+    <p class="pm-note">{{ _("Пока пусто. Отправь запрос.") }}</p>
   </template>
-  <div class="max-h-80 overflow-auto space-y-1">
+  <div class="max-h-80 overflow-auto rounded border border-[#e6e6e6]" x-show="log.length">
     <template x-for="(e, i) in log" :key="i + e.at">
-      <div class="rounded-lg border border-slate-200">
-        <button type="button" class="flex w-full items-center gap-2 px-2 py-1.5 text-left text-sm hover:bg-slate-50" @click="openedLog = openedLog === i ? null : i">
-          <span class="text-xs text-slate-400" x-text="e.at"></span>
-          <span class="font-semibold text-indigo-700" x-text="e.request.method"></span>
-          <span class="code-area truncate flex-1" x-text="e.request.url"></span>
-          <span class="rounded px-1.5 text-xs font-semibold" :class="statusClass(e.response ? e.response.status : 0)" x-text="e.response ? e.response.status : '—'"></span>
+      <div>
+        <button type="button" class="pm-console-row" @click="openedLog = openedLog === i ? null : i">
+          <span class="pm-caret" x-text="openedLog === i ? '▾' : '▸'"></span>
+          <b :style="{ color: methodColor(e.request.method) }" x-text="e.request.method"></b>
+          <span class="pm-url-cell" x-text="e.request.url"></span>
+          <b :class="statusClass(e.response ? e.response.status : 0)" x-text="e.response ? e.response.status : '—'"></b>
+          <span class="pm-time" x-show="e.timeMs !== undefined" x-text="e.timeMs + ' ms'"></span>
         </button>
-        <div x-show="openedLog === i" class="border-t border-slate-100 p-2 text-xs space-y-2">
-          <div>
-            <div class="font-semibold text-slate-600">▶ Request Headers</div>
-            <pre class="code-area m-0 whitespace-pre-wrap" x-html="prettyHeaders(e.request.headers)"></pre>
-          </div>
-          <div>
-            <div class="font-semibold text-slate-600">▶ Request Body</div>
-            <pre class="code-area m-0 whitespace-pre-wrap" x-html="pretty(e.request.body)"></pre>
-          </div>
-          <div x-show="e.response">
-            <div class="font-semibold text-slate-600">◀ Response Headers</div>
-            <pre class="code-area m-0 whitespace-pre-wrap" x-html="e.response ? prettyHeaders(Object.fromEntries(e.response.headers)) : ''"></pre>
-          </div>
-          <div x-show="e.response">
-            <div class="font-semibold text-slate-600">◀ Response Body</div>
-            <pre class="code-area m-0 max-h-48 overflow-auto whitespace-pre-wrap" x-html="e.response ? pretty(e.response.body) : ''"></pre>
-          </div>
+        <div x-show="openedLog === i" class="pm-console-detail">
+          <h4>▶ Request Headers</h4>
+          <pre x-html="prettyHeaders(e.request.headers)"></pre>
+          <h4>▶ Request Body</h4>
+          <pre x-html="pretty(e.request.body)"></pre>
+          <h4 x-show="e.response">◀ Response Headers</h4>
+          <pre x-show="e.response" x-html="e.response ? prettyHeaders(Object.fromEntries(e.response.headers)) : ''"></pre>
+          <h4 x-show="e.response">◀ Response Body</h4>
+          <pre x-show="e.response" class="max-h-48 overflow-auto" x-html="e.response ? pretty(e.response.body) : ''"></pre>
         </div>
       </div>
     </template>

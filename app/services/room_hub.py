@@ -42,6 +42,7 @@ SHARED_FIELDS: frozenset[str] = frozenset(
         "body",
         "tab",
         "respTab",
+        "respView",
         "openedLog",
         "sending",
         "response",

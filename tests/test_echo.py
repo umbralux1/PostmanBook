@@ -95,7 +95,7 @@ async def test_pages_render_and_set_cookie(postman: AsyncClient) -> None:
     assert "httponly" in r.headers["set-cookie"].lower()
     r = await postman.get("/chapters/ch01")
     assert r.status_code == 200
-    assert "Mini-Postman" in r.text
+    assert 'class="pm"' in r.text  # мини-Postman на странице
     assert "Your first POST with JSON" in r.text
 
 
