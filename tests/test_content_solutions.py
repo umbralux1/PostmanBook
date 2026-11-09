@@ -88,8 +88,8 @@ async def send_all(client: AsyncClient, requests: list[Req]) -> list[dict[str, A
 SOLUTIONS: dict[str, list[Req]] = {
     "ch01-task1": [{"url": "/api/echo?source=postman&user=student"}],
     "ch01-task2": [{"url": "/api/echo?source=postman&user=student&ticket_id=123&status=open"}],
-    "ch01-task3": [{"method": "POST", "url": "/api/echo", "headers": JSON_CT, "body": TICKET}],
-    "ch01-task4": [
+    "ch02-task1": [{"method": "POST", "url": "/api/echo", "headers": JSON_CT, "body": TICKET}],
+    "ch02-task2": [
         {
             "method": "POST",
             "url": "/api/echo",
@@ -97,13 +97,13 @@ SOLUTIONS: dict[str, list[Req]] = {
             "body": TICKET,
         }
     ],
-    "ch01-task5": [
+    "ch02-task3": [
         {"url": "/api/status/404"},
         {"url": "/api/status/200"},
         {"url": "/api/status/500"},
     ],
-    "ch01-task6": [{"method": "POST", "url": "/api/echo", "headers": JSON_CT, "body": TICKET}],
-    "ch01-task7": [
+    "ch02-task4": [{"method": "POST", "url": "/api/echo", "headers": JSON_CT, "body": TICKET}],
+    "ch02-task5": [
         {
             "method": "POST",
             "url": "/api/echo",
@@ -126,14 +126,14 @@ MISTAKES: list[tuple[str, list[Req], str]] = [
     ("ch01-task1", [{"url": "/api/ech0?source=postman&user=student"}], "/api/echo"),
     ("ch01-task1", [{"url": "/api/echo?source=postman?user=student"}], "&"),
     ("ch01-task2", [{"url": "/api/echo?ticket_id=123&status=open"}], "source=postman"),
-    ("ch01-task3", [{"method": "POST", "url": "/api/echo", "body": TICKET}], "Content-Type"),
+    ("ch02-task1", [{"method": "POST", "url": "/api/echo", "body": TICKET}], "Content-Type"),
     (
-        "ch01-task3",
+        "ch02-task1",
         [{"method": "POST", "url": "/api/echo", "headers": JSON_CT, "body": TICKET[:-1] + ",}"}],
         "JSON",
     ),
     (
-        "ch01-task3",
+        "ch02-task1",
         [
             {
                 "method": "POST",
@@ -144,16 +144,16 @@ MISTAKES: list[tuple[str, list[Req], str]] = [
         ],
         "кавычках",
     ),
-    ("ch01-task3", [{"url": "/api/echo", "headers": JSON_CT}], "POST"),
+    ("ch02-task1", [{"url": "/api/echo", "headers": JSON_CT}], "POST"),
     (
-        "ch01-task4",
+        "ch02-task2",
         [{"method": "POST", "url": "/api/echo", "headers": JSON_CT, "body": TICKET}],
         "x-debug-source",
     ),
-    ("ch01-task5", [{"url": "/api/status/200"}, {"url": "/api/status/500"}], "404"),
-    ("ch01-task5", [{"url": "/api/nope"}], "/api/status/"),
+    ("ch02-task3", [{"url": "/api/status/200"}, {"url": "/api/status/500"}], "404"),
+    ("ch02-task3", [{"url": "/api/nope"}], "/api/status/"),
     (
-        "ch01-task7",
+        "ch02-task5",
         [
             {
                 "method": "POST",
@@ -165,7 +165,7 @@ MISTAKES: list[tuple[str, list[Req], str]] = [
         "воспроизведи",
     ),
     (
-        "ch01-task7",
+        "ch02-task5",
         [
             {
                 "method": "POST",
@@ -202,8 +202,8 @@ async def test_mistake_fails_with_hint(
 
 
 async def test_console_task_needs_console(client: AsyncClient) -> None:
-    history = await send_all(client, SOLUTIONS["ch01-task6"])
-    result = evaluate("ch01-task6", history, {"consoleOpenedAt": None})
+    history = await send_all(client, SOLUTIONS["ch02-task4"])
+    result = evaluate("ch02-task4", history, {"consoleOpenedAt": None})
     assert result["passed"] is False
     assert result["waitingConsole"] is True
     assert "Console" in result["hint"]

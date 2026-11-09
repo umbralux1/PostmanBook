@@ -1,0 +1,224 @@
+chapter_id: ch02
+tasks:
+  - id: ch02-task1
+    order: 1
+    title: "Первый POST с JSON"
+    description_md: |
+      Создай `POST`-запрос на `{{BASE_URL}}/api/echo`. В теле отправь JSON:
+
+      ```json
+      {
+        "ticket_id": "123",
+        "message": "Не работает кнопка сохранения",
+        "priority": "high"
+      }
+      ```
+
+      Не забудь заголовок `Content-Type: application/json`.
+
+      **Как сделать:**
+
+      1. Выбери метод `POST`, в адресе оставь только `{{BASE_URL}}/api/echo`
+         (параметры из главы 1 можно удалить).
+      2. Вкладка **Body** → переключатель **raw JSON** → вставь JSON выше.
+         Под полем должно появиться зелёное «JSON корректный».
+      3. Вкладка **Headers** → в пустой строке Key `Content-Type`,
+         Value `application/json`.
+      4. Нажми **Send**.
+
+      **Что должно быть:**
+      - статус `200`;
+      - в ответе есть блок `json` с твоими данными;
+      - в блоке `headers` ответа есть `content-type: application/json`.
+
+      Помни: это echo-сервер. `200` здесь значит «получил вот это», а не
+      «заявка создана» — он ничего не сохраняет.
+
+      **Ответь себе:** почему для `POST` понадобилось тело, а для `GET` — нет?
+
+      <details markdown="1">
+      <summary>Проверь себя</summary>
+
+      `GET` только просит данные — передавать серверу нечего, все уточнения
+      помещаются в параметры адреса. `POST` отправляет данные, которые сервер
+      должен принять (например, текст новой заявки), и для них нужно место —
+      тело. А заголовок `Content-Type` подсказывает серверу, что тело
+      записано в формате JSON.
+
+      </details>
+    expected:
+      response:
+        - {path: status, equals: 200, hint: "Сервер не ответил 200. Проверь адрес ({{BASE_URL}}/api/echo) и что в JSON нет ошибок — кавычки и запятые."}
+        - {path: body.method, equals: POST, hint: "Создание — это всегда POST, не GET."}
+        - {path: body.headers.content-type, contains: application/json, hint: "Сервер не знает, что тело — JSON: добавь заголовок Content-Type: application/json."}
+        - {path: body.json, exists: true, hint: "Сервер не получил JSON. Во вкладке Body выбери raw JSON и вставь тело из задания."}
+        - {path: body.json.ticket_id, equals: "123", hint: "ticket_id должен быть строкой \"123\" — в двойных кавычках."}
+        - {path: body.json.message, exists: true, hint: "В теле не хватает поля message."}
+        - {path: body.json.priority, in: [low, medium, high], hint: "priority должен быть одним из: \"low\", \"medium\", \"high\"."}
+
+  - id: ch02-task2
+    order: 2
+    title: "Заголовки"
+    description_md: |
+      В том же `POST`-запросе открой вкладку **Headers** и добавь:
+
+      - **Key:** `X-Debug-Source`
+      - **Value:** `support-training`
+
+      **Как сделать:** `Content-Type` из прошлого задания не удаляй — новый
+      заголовок впиши в следующую пустую строку. Тело тоже оставь как было.
+      Нажми **Send**.
+
+      **Что должно быть:** в блоке `headers` ответа ты видишь
+      `x-debug-source: support-training` (сервер записывает названия
+      заголовков маленькими буквами — для HTTP это одно и то же).
+
+      **Ответь себе:** зачем нужны заголовки, если уже есть URL и тело?
+
+      <details markdown="1">
+      <summary>Проверь себя</summary>
+
+      URL говорит, *куда* идёт запрос, тело — *что* в нём лежит. Заголовки
+      описывают сам запрос: в каком формате тело (`Content-Type`), кто
+      отправляет (`Authorization`), какой ответ хотим получить (`Accept`).
+      Их удобно держать отдельно: сервер читает их до тела и по ним решает,
+      как обработать запрос — или сразу отказать (например, `401` без токена).
+
+      </details>
+    expected:
+      response:
+        - {path: status, equals: 200, hint: "Сервер не ответил 200. Проверь адрес ({{BASE_URL}}/api/echo) и JSON в теле."}
+        - {path: body.method, equals: POST, hint: "Нужен POST-запрос из задания 1."}
+        - {path: body.headers.content-type, contains: application/json, hint: "Не удаляй заголовок Content-Type: application/json из задания 1."}
+        - {path: body.headers.x-debug-source, equals: support-training, hint: "В headers ответа нет x-debug-source: support-training. Добавь заголовок во вкладке Headers."}
+        - {path: body.json, exists: true, hint: "Оставь тело из задания 1."}
+
+  - id: ch02-task3
+    order: 3
+    title: "Статус-коды вживую"
+    description_md: |
+      Отправь три `GET`-запроса и запиши в блокнот результат каждого:
+
+      1. `GET {{BASE_URL}}/api/status/200`
+      2. `GET {{BASE_URL}}/api/status/404`
+      3. `GET {{BASE_URL}}/api/status/500`
+
+      **Как сделать:** выбери метод `GET`, во вкладке **Body** выбери `none`.
+      Впиши первый адрес, нажми **Send**, потом поменяй число в адресе и
+      отправь снова. Задание засчитается, когда будут отправлены все три.
+
+      Для каждого определи:
+      - статус-код;
+      - группу (`2xx`, `4xx`, `5xx`);
+      - что это значит для поддержки.
+
+      <details markdown="1">
+      <summary>Проверь себя</summary>
+
+      - `200` — группа `2xx`, успех, всё в порядке.
+      - `404` — группа `4xx`, неверный URL или объекта нет: проверяем адрес
+        и параметры у себя.
+      - `500` — группа `5xx`, проблема на сервере: собираем детали (метод,
+        URL, время, тело запроса и ответа) и эскалируем.
+
+      </details>
+    # Три ответа в любом порядке.
+    expected:
+      steps:
+        - - {path: status, equals: 200, hint: "Отправь GET на {{BASE_URL}}/api/status/200."}
+          - {path: body.status, equals: 200, hint: "Отправь GET на {{BASE_URL}}/api/status/200."}
+        - - {path: status, equals: 404, hint: "Теперь отправь GET на {{BASE_URL}}/api/status/404."}
+          - {path: body.status, equals: 404, hint: "Адрес должен быть именно {{BASE_URL}}/api/status/404."}
+        - - {path: status, equals: 500, hint: "Теперь отправь GET на {{BASE_URL}}/api/status/500."}
+          - {path: body.status, equals: 500, hint: "Адрес должен быть именно {{BASE_URL}}/api/status/500."}
+
+  - id: ch02-task4
+    order: 4
+    title: "Console"
+    description_md: |
+      Отправь `POST`-запрос из задания 1 ещё раз, затем открой **Console**
+      (вкладка в мини-Postman) и найди там:
+
+      - метод запроса;
+      - полный URL;
+      - заголовки запроса (включая `Content-Type`);
+      - тело запроса;
+      - статус ответа;
+      - тело ответа.
+
+      **Как сделать:** собери POST из задания 1 (метод, тело, `Content-Type`),
+      нажми **Send**, потом открой вкладку **Console** и нажми на верхнюю
+      строку журнала — она раскроется. Значками ▶ отмечено то, что ушло на
+      сервер, значками ◀ — то, что пришло обратно.
+
+      **Что должно быть:** ты можешь показать пальцем, где в консоли видно
+      `Content-Type: application/json` и твой отправленный JSON.
+
+      **Ответь себе:** почему Console важнее, чем просто «посмотреть на панель ответа»?
+
+      <details markdown="1">
+      <summary>Проверь себя</summary>
+
+      Панель ответа показывает только ответ. Console показывает **обе
+      стороны**: что именно ушло на сервер и что пришло назад. Если ошибка в
+      самом запросе (забыли заголовок, опечатка в адресе, сломанное тело),
+      увидеть это можно только в Console. Плюс там хранится история —
+      можно сравнить удачный запрос с неудачным.
+
+      </details>
+    expected:
+      response:
+        - {path: status, equals: 200, hint: "Сервер не ответил 200. Проверь адрес ({{BASE_URL}}/api/echo) и JSON в теле."}
+        - {path: body.method, equals: POST, hint: "Нужен POST-запрос из задания 1."}
+        - {path: body.headers.content-type, contains: application/json, hint: "Добавь заголовок Content-Type: application/json."}
+        - {path: body.json, exists: true, hint: "Добавь JSON-тело из задания 1."}
+      require_console: true
+      console_hint: "Ответ правильный. Теперь открой вкладку Console и найди там этот запрос."
+
+  - id: ch02-task5
+    order: 5
+    title: "Мини-тикет"
+    description_md: |
+      Пользователь пишет:
+
+      > «Отправляю заявку через `POST /tickets`, но получаю `400 Bad Request`.
+      > Вот тело: `{"title": "Ошибка", "priority": high}`. Что не так?»
+
+      **Что сделать:**
+
+      1. Воспроизведи похожий запрос на `{{BASE_URL}}/api/echo` методом `POST` с
+         заголовком `Content-Type: application/json`.
+      2. Отправь тело **ровно как у пользователя**: `high` без кавычек.
+         Мини-Postman подсветит ошибку JSON — так и задумано, всё равно
+         нажми **Send**.
+      3. Посмотри, что вернёт сервер и что покажет Console.
+      4. Исправь тело так, чтобы стало валидно, и отправь снова.
+
+      **Что должно быть:**
+      - первый запрос падает с ошибкой (`400`);
+      - второй — проходит с `200`;
+      - ты можешь объяснить, что именно было сломано.
+
+      **Сформулируй ответ пользователю** в 2–3 предложениях, потом сравни
+      с примером.
+
+      <details markdown="1">
+      <summary>Пример ответа</summary>
+
+      > «В теле запроса значение `priority` указано без кавычек, из-за этого
+      > JSON невалиден и сервер возвращает `400 Bad Request`. Нужно отправлять
+      > так: `"priority": "high"`.»
+
+      Почему так: `high` — это не число, не `true`/`false` и не `null`, значит
+      это должна быть строка, а строки в JSON всегда в двойных кавычках.
+
+      </details>
+    # Два ответа по порядку: сначала ошибка 400, потом успех.
+    expected:
+      ordered: true
+      steps:
+        - - {path: status, equals: 400, hint: "Сначала воспроизведи ошибку: тело ровно как у пользователя (high без кавычек) и заголовок Content-Type: application/json. Сервер должен ответить 400."}
+          - {path: body.error, equals: invalid_json, hint: "Сервер должен ответить ошибкой invalid_json — отправь тело ровно как у пользователя."}
+        - - {path: status, equals: 200, hint: "Теперь исправь JSON: priority должен быть строкой в кавычках — \"high\"."}
+          - {path: body.json.title, exists: true, hint: "Не потеряй поле title."}
+          - {path: body.json.priority, equals: high, hint: "priority должен быть строкой \"high\"."}

@@ -96,7 +96,11 @@ async def test_pages_render_and_set_cookie(postman: AsyncClient) -> None:
     r = await postman.get("/chapters/ch01")
     assert r.status_code == 200
     assert 'class="pm"' in r.text  # мини-Postman на странице
+    assert "Parameters via the Params tab" in r.text
+    assert 'href="/chapters/ch02"' in r.text  # ссылка на следующую главу
+    r = await postman.get("/chapters/ch02")
     assert "Your first POST with JSON" in r.text
+    assert "Next chapter</div>" not in r.text  # глава 2 последняя
 
 
 async def test_api_does_not_issue_cookie(postman: AsyncClient) -> None:
@@ -106,11 +110,11 @@ async def test_api_does_not_issue_cookie(postman: AsyncClient) -> None:
 
 async def test_quiz_submission(client: AsyncClient) -> None:
     r = await client.post(
-        "/chapters/ch01/quiz", data={"q1": "B", "q2": "C", "q3": "C", "q4": "B", "q5": "D"}
+        "/chapters/ch02/quiz", data={"q1": "B", "q2": "C", "q3": "D", "q4": "B", "q5": "B"}
     )
     assert r.status_code == 200
     assert "5 of 5" in r.text
     r = await client.post(
-        "/chapters/ch01/quiz", data={"q1": "A", "q2": "C", "q3": "C", "q4": "B", "q5": "D"}
+        "/chapters/ch02/quiz", data={"q1": "A", "q2": "C", "q3": "D", "q4": "B", "q5": "B"}
     )
     assert "4 of 5" in r.text

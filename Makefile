@@ -87,7 +87,7 @@ css: ## Пересобрать Tailwind CSS (нужен Node.js)
 
 # ---------- Docker ----------
 
-up: env ## docker compose up (PostgreSQL + приложение) → http://localhost:8000
+up: env ## docker compose up (приложение + SQLite в томе) → http://localhost:8000
 	docker compose up --build
 
 up-d: env ## То же, в фоне

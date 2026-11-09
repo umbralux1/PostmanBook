@@ -172,11 +172,14 @@ def chapter_page(
     ch = chapter_view(_get_chapter(session, chapter_id), lang, base)
     tasks = [task_view(t, lang, base) for t in list_tasks(session, ch.id)]
     passed = passed_task_ids(session, user)
+    following = [c for c in list_chapters(session) if c.order > ch.order]
+    next_chapter = chapter_view(following[0], lang, base) if following else None
     return render(
         request,
         "chapter.html",
         {
             "chapter": ch,
+            "next_chapter": next_chapter,
             "tasks": tasks,
             "passed": passed,
             "done": sum(1 for t in tasks if t.id in passed),

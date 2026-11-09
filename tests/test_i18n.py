@@ -41,7 +41,7 @@ async def test_default_is_english(postman: AsyncClient) -> None:
     r = await postman.get("/chapters/ch01")
     assert '<html lang="en">' in r.text
     assert "All chapters" in r.text
-    assert "HTTP basics and your first request in Postman" in r.text
+    assert "Your first request: HTTP, URLs and the mini-Postman" in r.text
     # В <head> — каталог переводов с русскими ключами, а t('…') в Alpine-выражениях
     # переводится в браузере. Всё остальное в <body> должно быть английским.
     body = re.sub(r"\bt\('[^']*'", "", r.text.split("<body", 1)[1])
@@ -57,7 +57,7 @@ async def test_switch_to_russian(postman: AsyncClient) -> None:
     r = await postman.get("/chapters/ch01")
     assert '<html lang="ru">' in r.text
     assert "Все главы" in r.text
-    assert "HTTP-минимум" in r.text
+    assert "Первый запрос: HTTP" in r.text
     assert "Первый GET-запрос" in r.text
 
 
@@ -66,7 +66,7 @@ async def test_english_content(postman: AsyncClient) -> None:
     r = await postman.get("/chapters/ch01")
     assert '<html lang="en">' in r.text
     assert "All chapters" in r.text
-    assert "HTTP basics and your first request in Postman" in r.text
+    assert "Your first request: HTTP, URLs and the mini-Postman" in r.text
     assert "Your first GET request" in r.text
     assert "Check yourself" in r.text
     # Ожидания к ответу и подсказки — английские (в data-атрибуте для JS).
@@ -124,7 +124,7 @@ async def test_api_errors_in_russian_when_chosen(postman: AsyncClient) -> None:
 async def test_quiz_result_in_english(client: AsyncClient) -> None:
     client.cookies.set("lang", "en")
     r = await client.post(
-        "/chapters/ch01/quiz", data={"q1": "A", "q2": "C", "q3": "C", "q4": "B", "q5": "D"}
+        "/chapters/ch02/quiz", data={"q1": "A", "q2": "C", "q3": "D", "q4": "B", "q5": "B"}
     )
     assert "Correct answers: 4 of 5" in r.text
     assert "Whether the URL and parameters are correct" in r.text
@@ -134,7 +134,7 @@ async def test_quiz_result_in_english(client: AsyncClient) -> None:
 async def test_progress_badge_in_english(client: AsyncClient) -> None:
     client.cookies.set("lang", "en")
     r = await client.get("/partials/progress/ch01")
-    assert "0 / 7 tasks" in r.text
+    assert "0 / 2 tasks" in r.text
 
 
 async def test_task_texts_show_full_site_url(postman: AsyncClient) -> None:

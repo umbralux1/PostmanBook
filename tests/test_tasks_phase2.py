@@ -13,13 +13,13 @@ BODY = {"ticket_id": "123", "message": "Не работает кнопка со�
 async def test_postman_request_with_task_code_is_stored(
     postman: AsyncClient, session: Session
 ) -> None:
-    r = await postman.post("/api/echo", json=BODY, headers={"X-Task-Code": "ch01-task3"})
+    r = await postman.post("/api/echo", json=BODY, headers={"X-Task-Code": "ch02-task1"})
     assert r.status_code == 200
-    assert r.json()["task_code"] == "ch01-task3"
+    assert r.json()["task_code"] == "ch02-task1"
     rows = session.exec(select(ReceivedRequest)).all()
     assert len(rows) == 1
     rr = rows[0]
-    assert rr.task_code == "ch01-task3" and rr.method == "POST" and rr.path == "/api/echo"
+    assert rr.task_code == "ch02-task1" and rr.method == "POST" and rr.path == "/api/echo"
     assert json.loads(rr.body) == BODY
     # Задание фазы 1 — сервер его не проверяет, только логирует.
     assert rr.validated is False
@@ -75,7 +75,7 @@ async def test_last_endpoint(postman: AsyncClient) -> None:
 
 async def test_status_requests_also_logged(postman: AsyncClient, session: Session) -> None:
     for code in (200, 404, 500):
-        await postman.get(f"/api/status/{code}", headers={"X-Task-Code": "ch01-task5"})
+        await postman.get(f"/api/status/{code}", headers={"X-Task-Code": "ch02-task3"})
     assert len(session.exec(select(ReceivedRequest)).all()) == 3
 
 

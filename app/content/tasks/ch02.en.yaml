@@ -1,0 +1,219 @@
+chapter_id: ch02
+tasks:
+  - id: ch02-task1
+    order: 1
+    title: "Your first POST with JSON"
+    description_md: |
+      Create a `POST` request to `{{BASE_URL}}/api/echo`. Send this JSON in the body:
+
+      ```json
+      {
+        "ticket_id": "123",
+        "message": "The save button doesn't work",
+        "priority": "high"
+      }
+      ```
+
+      Don't forget the `Content-Type: application/json` header.
+
+      **How to do it:**
+
+      1. Choose the `POST` method and keep just `{{BASE_URL}}/api/echo` in the address
+         (you can remove the parameters from chapter 1).
+      2. **Body** tab → **raw JSON** switch → paste the JSON above.
+         A green “JSON is valid” should appear under the field.
+      3. **Headers** tab → in the empty row, Key `Content-Type`,
+         Value `application/json`.
+      4. Press **Send**.
+
+      **What you should see:**
+      - status `200`;
+      - a `json` block in the response with your data;
+      - `content-type: application/json` in the `headers` block of the response.
+
+      Remember: this is an echo server. Here `200` means “I received this”, not
+      “the ticket was created” — it doesn't save anything.
+
+      **Ask yourself:** why did `POST` need a body while `GET` didn't?
+
+      <details markdown="1">
+      <summary>Check yourself</summary>
+
+      `GET` only asks for data — there's nothing to pass to the server, and any
+      refinements fit into the address parameters. `POST` sends data the server has to
+      accept (for example, the text of a new ticket), and that data needs a place — the
+      body. The `Content-Type` header tells the server that the body is written as JSON.
+
+      </details>
+    expected:
+      response:
+        - {path: status, equals: 200, hint: "The server didn't reply 200. Check the address ({{BASE_URL}}/api/echo) and that the JSON has no errors — quotes and commas."}
+        - {path: body.method, equals: POST, hint: "Creating is always POST, not GET."}
+        - {path: body.headers.content-type, contains: application/json, hint: "The server doesn't know the body is JSON: add the Content-Type: application/json header."}
+        - {path: body.json, exists: true, hint: "The server didn't receive JSON. In the Body tab, choose raw JSON and paste the body from the task."}
+        - {path: body.json.ticket_id, equals: "123", hint: "ticket_id must be the string \"123\" — in double quotes."}
+        - {path: body.json.message, exists: true, hint: "The body is missing the message field."}
+        - {path: body.json.priority, in: [low, medium, high], hint: "priority must be one of: \"low\", \"medium\", \"high\"."}
+
+  - id: ch02-task2
+    order: 2
+    title: "Headers"
+    description_md: |
+      In the same `POST` request, open the **Headers** tab and add:
+
+      - **Key:** `X-Debug-Source`
+      - **Value:** `support-training`
+
+      **How to do it:** don't remove `Content-Type` from the previous task — type the new
+      header into the next empty row. Keep the body as it was too. Press **Send**.
+
+      **What you should see:** `x-debug-source: support-training` in the `headers` block
+      of the response (the server lowercases header names — for HTTP it's the same thing).
+
+      **Ask yourself:** why do we need headers if there's already a URL and a body?
+
+      <details markdown="1">
+      <summary>Check yourself</summary>
+
+      The URL says *where* the request goes, the body says *what* is in it. Headers
+      describe the request itself: the body format (`Content-Type`), who is sending it
+      (`Authorization`), what response we want (`Accept`). It's convenient to keep them
+      separate: the server reads them before the body and uses them to decide how to
+      handle the request — or to refuse right away (for example, `401` without a token).
+
+      </details>
+    expected:
+      response:
+        - {path: status, equals: 200, hint: "The server didn't reply 200. Check the address ({{BASE_URL}}/api/echo) and the JSON in the body."}
+        - {path: body.method, equals: POST, hint: "You need the POST request from task 1."}
+        - {path: body.headers.content-type, contains: application/json, hint: "Don't remove the Content-Type: application/json header from task 1."}
+        - {path: body.headers.x-debug-source, equals: support-training, hint: "The response headers have no x-debug-source: support-training. Add the header in the Headers tab."}
+        - {path: body.json, exists: true, hint: "Keep the body from task 1."}
+
+  - id: ch02-task3
+    order: 3
+    title: "Status codes in action"
+    description_md: |
+      Send three `GET` requests and write down the result of each:
+
+      1. `GET {{BASE_URL}}/api/status/200`
+      2. `GET {{BASE_URL}}/api/status/404`
+      3. `GET {{BASE_URL}}/api/status/500`
+
+      **How to do it:** choose the `GET` method and select `none` in the **Body** tab.
+      Type the first address, press **Send**, then change the number in the address and
+      send again. The task counts once all three have been sent.
+
+      For each one, work out:
+      - the status code;
+      - the group (`2xx`, `4xx`, `5xx`);
+      - what it means for support.
+
+      <details markdown="1">
+      <summary>Check yourself</summary>
+
+      - `200` — group `2xx`, success, all good.
+      - `404` — group `4xx`, wrong URL or the object doesn't exist: check the address
+        and parameters on your side.
+      - `500` — group `5xx`, a problem on the server: collect the details (method,
+        URL, time, request and response bodies) and escalate.
+
+      </details>
+    # Three responses in any order.
+    expected:
+      steps:
+        - - {path: status, equals: 200, hint: "Send a GET to {{BASE_URL}}/api/status/200."}
+          - {path: body.status, equals: 200, hint: "Send a GET to {{BASE_URL}}/api/status/200."}
+        - - {path: status, equals: 404, hint: "Now send a GET to {{BASE_URL}}/api/status/404."}
+          - {path: body.status, equals: 404, hint: "The address must be exactly {{BASE_URL}}/api/status/404."}
+        - - {path: status, equals: 500, hint: "Now send a GET to {{BASE_URL}}/api/status/500."}
+          - {path: body.status, equals: 500, hint: "The address must be exactly {{BASE_URL}}/api/status/500."}
+
+  - id: ch02-task4
+    order: 4
+    title: "Console"
+    description_md: |
+      Send the `POST` request from task 1 again, then open the **Console**
+      (a tab in the mini-Postman) and find there:
+
+      - the request method;
+      - the full URL;
+      - the request headers (including `Content-Type`);
+      - the request body;
+      - the response status;
+      - the response body.
+
+      **How to do it:** build the POST from task 1 (method, body, `Content-Type`),
+      press **Send**, then open the **Console** tab and click the top row of the log —
+      it will expand. ▶ marks what was sent to the server, ◀ marks what came back.
+
+      **What you should see:** you can point to where the Console shows
+      `Content-Type: application/json` and the JSON you sent.
+
+      **Ask yourself:** why is the Console more important than just looking at the response panel?
+
+      <details markdown="1">
+      <summary>Check yourself</summary>
+
+      The response panel shows only the response. The Console shows **both sides**:
+      exactly what was sent to the server and what came back. If the error is in the
+      request itself (a missing header, a typo in the address, a broken body), you can
+      only see it in the Console. It also keeps the history, so you can compare a
+      successful request with a failed one.
+
+      </details>
+    expected:
+      response:
+        - {path: status, equals: 200, hint: "The server didn't reply 200. Check the address ({{BASE_URL}}/api/echo) and the JSON in the body."}
+        - {path: body.method, equals: POST, hint: "You need the POST request from task 1."}
+        - {path: body.headers.content-type, contains: application/json, hint: "Add the Content-Type: application/json header."}
+        - {path: body.json, exists: true, hint: "Add the JSON body from task 1."}
+      require_console: true
+      console_hint: "The response is correct. Now open the Console tab and find this request there."
+
+  - id: ch02-task5
+    order: 5
+    title: "A mini ticket"
+    description_md: |
+      A user writes:
+
+      > “I submit a ticket via `POST /tickets`, but I get `400 Bad Request`.
+      > Here's the body: `{"title": "Error", "priority": high}`. What's wrong?”
+
+      **What to do:**
+
+      1. Reproduce a similar request to `{{BASE_URL}}/api/echo` using the `POST` method with the
+         `Content-Type: application/json` header.
+      2. Send the body **exactly as the user did**: `high` without quotes.
+         The mini-Postman will highlight the JSON error — that's intended, press
+         **Send** anyway.
+      3. See what the server returns and what the Console shows.
+      4. Fix the body so it's valid, and send it again.
+
+      **What you should see:**
+      - the first request fails with an error (`400`);
+      - the second one succeeds with `200`;
+      - you can explain what exactly was broken.
+
+      **Write a reply to the user** in 2–3 sentences, then compare it with the example.
+
+      <details markdown="1">
+      <summary>Example reply</summary>
+
+      > “In the request body, the `priority` value has no quotes, so the JSON is invalid
+      > and the server returns `400 Bad Request`. Please send it like this:
+      > `"priority": "high"`.”
+
+      Why: `high` is not a number, not `true`/`false` and not `null`, so it has to be
+      a string, and strings in JSON always go in double quotes.
+
+      </details>
+    # Two responses in order: first a 400 error, then a success.
+    expected:
+      ordered: true
+      steps:
+        - - {path: status, equals: 400, hint: "First reproduce the error: the body exactly as the user sent it (high without quotes) and the Content-Type: application/json header. The server should reply 400."}
+          - {path: body.error, equals: invalid_json, hint: "The server should reply with an invalid_json error — send the body exactly as the user did."}
+        - - {path: status, equals: 200, hint: "Now fix the JSON: priority must be a string in quotes — \"high\"."}
+          - {path: body.json.title, exists: true, hint: "Don't lose the title field."}
+          - {path: body.json.priority, equals: high, hint: "priority must be the string \"high\"."}
