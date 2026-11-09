@@ -1,0 +1,26 @@
+<div class="border-t border-slate-200">
+  <template x-if="!response">
+    <div class="p-6 text-center text-sm text-slate-400">{{ _("Нажми Send, и здесь появится ответ сервера.") }}</div>
+  </template>
+  <template x-if="response">
+    <div>
+      <div class="flex flex-wrap items-center gap-3 px-3 py-2 bg-slate-50 text-sm">
+        <span class="font-semibold text-slate-700">{{ _("Ответ") }}</span>
+        <span class="rounded-md px-2 py-0.5 font-semibold" :class="statusClass(response.status)"
+              x-text="response.status + ' ' + response.statusText"></span>
+        <span class="text-slate-500" x-text="response.timeMs + ' ms'"></span>
+        <span class="text-slate-500" x-text="response.size + ' B'"></span>
+        <div class="ml-auto flex gap-1">
+          <button type="button" @click="respTab='body'" :class="respTab==='body' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500'" class="rounded px-2 py-0.5">Body</button>
+          <button type="button" @click="respTab='headers'" :class="respTab==='headers' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500'" class="rounded px-2 py-0.5">Headers</button>
+        </div>
+      </div>
+      <pre x-show="respTab==='body'" class="code-area m-0 max-h-80 overflow-auto whitespace-pre-wrap break-words p-3" x-html="pretty(response.text)"></pre>
+      <table x-show="respTab==='headers'" class="w-full text-sm">
+        <template x-for="h in response.headers" :key="h[0]">
+          <tr class="border-t border-slate-100"><td class="code-area px-3 py-1 text-slate-500 w-1/3" x-text="h[0]"></td><td class="code-area px-3 py-1 break-all" x-text="h[1]"></td></tr>
+        </template>
+      </table>
+    </div>
+  </template>
+</div>

@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}{{ task.title }} — {{ _("фаза 3") }}{% endblock %}
+{% block content %}
+{# Задел на этап 2: пользователь вставляет ответ внешнего API из своего Postman. #}
+<div class="max-w-2xl" x-data="{ raw: '', result: null, error: null,
+  async check() {
+    this.error = null;
+    const res = await fetch('/api/tasks/{{ task.id }}/external', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ raw: this.raw }), credentials: 'same-origin' });
+    const data = await res.json();
+    if (!res.ok) { this.error = data.message; return; }
+    this.result = data.validation;
+  } }">
+  <h1 class="text-2xl font-bold">{{ task.title }}</h1>
+  <div class="prose-trainer mt-3">{{ task.description_md | md }}</div>
+  <form class="mt-4 space-y-2" @submit.prevent="check()">
+    <label class="text-sm font-medium">{{ _("Вставь ответ из Postman (тело, можно со строкой статуса):") }}</label>
+    <textarea x-model="raw" rows="10" class="code-area w-full rounded-lg border border-slate-300 p-3" required></textarea>
+    <button class="rounded-lg bg-indigo-600 px-4 py-2 text-white">{{ _("Проверить") }}</button>
+  </form>
+  <p x-show="error" class="mt-2 text-rose-600 text-sm" x-text="error"></p>
+  <template x-if="result">
+    <div class="mt-3 rounded-lg p-3 text-sm" :class="result.passed ? 'bg-emerald-50' : 'bg-amber-50'">
+      <b x-text="result.passed ? t('Всё верно!') : t('Есть замечания')"></b>
+      <ul class="list-disc ml-5"><template x-for="h in result.hints"><li x-text="h"></li></template></ul>
+    </div>
+  </template>
+</div>
+{% endblock %}

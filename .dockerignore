@@ -1,0 +1,14 @@
+.git
+.venv
+venv
+.idea
+.env
+*.db
+__pycache__
+.pytest_cache
+.mypy_cache
+.ruff_cache
+tests
+node_modules
+content_source
+main.py

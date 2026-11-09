@@ -1,0 +1,33 @@
+{% set kind = task_kind(task.expected) %}
+<div class="rounded-xl border bg-white p-4 transition"
+     :class="$store.task.id === '{{ task.id }}' ? 'border-indigo-400 ring-2 ring-indigo-100' : 'border-slate-200'"
+     x-data="{ open: false }">
+  <div class="flex items-start justify-between gap-3">
+    <button type="button" class="text-left flex-1" @click="open = !open">
+      <div class="flex items-center gap-2">
+        <span class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold"
+              :class="$store.task.passed['{{ task.id }}'] ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-600'">
+          <span x-text="$store.task.passed['{{ task.id }}'] ? '✓' : '{{ task.order }}'"></span>
+        </span>
+        <span class="font-semibold text-slate-900">{{ task.title }}</span>
+      </div>
+      <span class="text-xs text-slate-400 ml-8" x-text="open ? t('свернуть') : t('показать условие')"></span>
+    </button>
+    <button type="button"
+            class="shrink-0 rounded-lg px-3 py-1.5 text-sm font-medium"
+            :class="$store.task.id === '{{ task.id }}' ? 'bg-indigo-600 text-white' : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100'"
+            @click="open = true; $store.task.select('{{ task.id }}', {{ task.title | tojson | forceescape }}, {{ task.expected | tojson | forceescape }})">
+      <span x-text="$store.task.id === '{{ task.id }}' ? t('Решаю') : t('Решать')"></span>
+    </button>
+  </div>
+  <div x-show="open" x-cloak class="prose-trainer mt-3 border-t border-slate-100 pt-3 text-sm">
+    {{ task.description_md | md }}
+    {% if kind == 'sequence' %}
+      <p class="text-xs text-slate-500">{{ _("Задание засчитается, когда сервер вернёт все нужные ответы — в любом порядке.") }}</p>
+    {% elif kind == 'ordered' %}
+      <p class="text-xs text-slate-500">{{ _("Нужно два ответа сервера по порядку: сначала ошибка, потом успех.") }}</p>
+    {% elif kind == 'console' %}
+      <p class="text-xs text-slate-500">{{ _("После успешного ответа открой вкладку Console в мини-Postman.") }}</p>
+    {% endif %}
+  </div>
+</div>

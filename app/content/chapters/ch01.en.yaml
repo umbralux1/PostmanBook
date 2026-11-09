@@ -1,0 +1,366 @@
+id: ch01
+title: "HTTP basics and your first request in Postman"
+order: 1
+phase: 1
+estimated_minutes: 90
+goal: |
+  Understand the “client → request → server → response” flow and make your first
+  requests in Postman, so you can read a response and find the basic information in it.
+after_completion: |
+  After this chapter you will be able to: send GET and POST requests, find the status
+  code and body of a response, open the Console and explain the difference between 2xx, 4xx and 5xx.
+checklist:
+  - "I can explain what an API is and why support needs Postman."
+  - "I know the four parts of an HTTP request."
+  - "I can break a URL into parts: protocol, host, path, query parameters."
+  - "I can explain the difference between GET and POST."
+  - "I know what 200, 400, 401, 403, 404 and 500 mean."
+  - "I can find the status code of a response in Postman."
+  - "I can open the Console and find the request headers and body there."
+  - "I understand how a query parameter differs from JSON in the body."
+  - "I can spot a JSON error: quotes, commas, string or number."
+  - "I know why the Content-Type: application/json header is needed."
+  - "I understand why we don't test everything on production or expose tokens."
+quiz:
+  - id: q1
+    question: "A user got `404 Not Found`. What do you check first?"
+    options:
+      A: "Whether the token is valid"
+      B: "Whether the URL and parameters are correct"
+      C: "Whether the user has permissions"
+      D: "The server logs"
+    answer: B
+    explanation: "404 means the server found nothing at that address. Check the URL, path and parameters first (for example, the object id)."
+  - id: q2
+    question: "A user got `500 Internal Server Error`. Who is most likely at fault?"
+    options:
+      A: "The user"
+      B: "The client-side application"
+      C: "The server"
+      D: "Postman"
+    answer: C
+    explanation: "5xx is a server-side error. Collect the request details and escalate to the developers."
+  - id: q3
+    question: "Which of these is NOT part of an HTTP request?"
+    options:
+      A: "Method"
+      B: "URL"
+      C: "Status code"
+      D: "Body"
+    answer: C
+    explanation: "The status code is part of the response, not the request. A request has a method, URL, headers and body."
+  - id: q4
+    question: "Which query parameters are in the address `/api/echo?source=postman&user=student`?"
+    options:
+      A: "Only `source=postman`"
+      B: "`source=postman` and `user=student`"
+      C: "`/api/echo`"
+      D: "There are no parameters, this is the request body"
+    answer: B
+    explanation: "Parameters start after `?` and are separated by `&`: there are two here."
+  - id: q5
+    question: "Which of these is valid JSON?"
+    options:
+      A: "`{\"priority\": high}`"
+      B: "`{'priority': 'high'}`"
+      C: "`{\"priority\": \"high\",}`"
+      D: "`{\"priority\": \"high\"}`"
+    answer: D
+    explanation: "Strings and keys go in double quotes, and there is no comma after the last pair."
+content_md: |
+  ## 1.1. Why support needs APIs and Postman
+
+  Imagine a ticket:
+
+  > “Hi! I click "Save", but the ticket doesn't get created. What should I do?”
+
+  The user only sees the button and the result. As a support specialist, you need to see **what exactly is sent to the server and what it replies**. Without that, all you can do is guess and forward the ticket to the developers.
+
+  Let's go step by step through what happens when the user clicks the button.
+
+  - The **client** is the program a person uses: a website in a browser, a mobile app, Postman.
+  - The **server** is a program on a remote computer. It stores data (tickets, users, orders) and performs actions.
+  - The client and the server communicate with **messages**. The client sends a **request** (“create a ticket”), and the server sends back a **response** (“done” or “error”).
+  - The rules for composing these messages are called **HTTP**. It is the common “language” of the internet: almost every website and app uses it.
+  - An **API** (pronounced “ay-pee-eye”) is a set of addresses and rules that let one program talk to another. For example: “to create a ticket, send a request to this address in this format”.
+
+  The flow:
+
+  ```
+  Client (app, Postman)  ──request──▶  Server
+                         ◀──response──
+  ```
+
+  Requests and responses are usually hidden from people: they only see buttons and pictures. **Postman** is a program that lets you **send a request by hand** and see the whole response, without the interface “decorations”.
+
+  Postman is a client. It doesn't “make the API”: it sends requests and honestly shows what the server returned. That is exactly what support needs: reproduce the problem, see what happened, and explain it.
+
+  > 💡 **Why this matters in support:** 80% of API tickets boil down to “the wrong request was sent” or “the server replied with an error”. Postman helps you tell one from the other in a minute.
+
+  ## 1.2. The parts of an HTTP request
+
+  Every request has four parts. It helps to think of a request as a letter:
+
+  | Part of the request | Letter analogy |
+  |---|---|
+  | Method | What we ask for: “read”, “create”, “delete” |
+  | URL | The address on the envelope |
+  | Headers | Notes on the envelope: “urgent”, “in English”, “from whom” |
+  | Body | The letter inside the envelope |
+
+  **1. Method** — what we want to do. The main methods:
+
+  | Method   | What it does                        | Real-life example                     |
+  |----------|-------------------------------------|---------------------------------------|
+  | `GET`    | Get data                            | Open the list of tickets              |
+  | `POST`   | Create something or send data       | Create a new ticket                   |
+  | `PUT`    | Replace an object entirely          | Overwrite a profile                   |
+  | `PATCH`  | Update part of an object            | Change only the name                  |
+  | `DELETE` | Delete                              | Delete a ticket                       |
+
+  To start with, two are enough: **`GET` — “let me see”**, **`POST` — “take this and save it”**.
+
+  **2. URL** — where we send the request. For example: `https://api.example.com/tickets`. We'll look at how an address is built in the next section.
+
+  **3. Headers** — extra information about the request: what format the data is in, who is sending it, which language to reply in. Each header is a “name: value” pair. Example: `Content-Type: application/json`.
+
+  **4. Body** — the data we send. Usually only `POST`, `PUT` and `PATCH` have a body: they need to pass something to the server. `GET` only asks for data, so it doesn't need a body. The body is most often written in JSON format (more on it in section 1.6).
+
+  A full request example:
+
+  ```http
+  POST https://api.example.com/tickets
+  Content-Type: application/json
+  Authorization: Bearer abc123
+
+  {
+    "title": "Button doesn't work",
+    "priority": "high"
+  }
+  ```
+
+  It reads like this: “**create** (`POST`) at the **address** `…/tickets` whatever is in the **body**; the body is **JSON** (`Content-Type`); here is my **pass** (`Authorization`)”.
+
+  > 💡 **Why this matters in support:** when a user says “I submit the ticket and it doesn't get created”, you need to find out which method, URL, headers and body were sent. The problem usually hides in one of these four parts.
+
+  ## 1.3. The request address: how a URL is built
+
+  Take this address:
+
+  ```
+  https://api.example.com/tickets?status=open&limit=10
+  ```
+
+  Let's break it into parts:
+
+  | Part | In the example | What it means |
+  |---|---|---|
+  | Protocol | `https://` | Which rules we use to communicate. `https` is the secure version of HTTP |
+  | Host (domain) | `api.example.com` | Which server. Like the city name on an envelope |
+  | Path | `/tickets` | Which section on the server. Like the street and house number |
+  | Query parameters | `?status=open&limit=10` | Refinements to the request: “only open ones, no more than 10” |
+
+  **Query parameters** go at the very end of the address and follow these rules:
+
+  - they start with a question mark `?`;
+  - each parameter is a `key=value` pair;
+  - parameters are separated by `&`.
+
+  Examples:
+
+  - `/api/echo?source=postman` — one parameter: key `source`, value `postman`;
+  - `/api/echo?source=postman&user=student` — two parameters.
+
+  Common mistakes: forgetting the `?`, using a second `?` instead of `&`, putting a space inside the address.
+
+  **How is a query parameter different from the body?** Parameters are part of the address. They are short, visible in the URL bar, and are usually used to *refine* or *filter*: “show tickets with status open”. The body is a separate part of the request where you put *data to be saved*: the ticket text, a user profile. That's why `GET` usually has parameters and no body, while `POST` has a body.
+
+  > 💡 **Why this matters in support:** a user writes “the filter doesn't work” — first look at the parameters in the URL. Often there's a typo in a key (`stauts=open`) or an extra `?`.
+
+  ## 1.4. The parts of an HTTP response
+
+  A response is simple too:
+
+  **1. Status code** — the main signal. A three-digit number that tells you right away whether it worked.
+
+  **2. Response headers** — information from the server: the format of the response, when it was sent, and so on.
+
+  **3. Response body** — the data. Almost always JSON.
+
+  Example:
+
+  ```http
+  200 OK
+  Content-Type: application/json
+
+  {
+    "ticket_id": "12345",
+    "status": "created"
+  }
+  ```
+
+  It reads like this: “**all good** (`200 OK`), the response is **JSON**, the ticket was created, its number is 12345”.
+
+  ## 1.5. Status codes: support's main tool
+
+  All codes fall into groups. The first digit defines the meaning.
+
+  | Group  | Meaning                             | Usually at fault        |
+  |--------|-------------------------------------|-------------------------|
+  | `2xx`  | Success                             | Nobody, all good        |
+  | `3xx`  | Redirect                            | Skipped in this chapter |
+  | `4xx`  | Error in the request (client side)  | User / app / token      |
+  | `5xx`  | Server error                        | Server                  |
+
+  Codes to know by heart:
+
+  - `200 OK` — all good, the data arrived;
+  - `201 Created` — an object was created (a typical response to `POST`);
+  - `400 Bad Request` — the request is malformed (for example, broken JSON);
+  - `401 Unauthorized` — the server doesn't know who you are: the token is missing, wrong or expired;
+  - `403 Forbidden` — the server knows who you are, but this user isn't allowed to do this;
+  - `404 Not Found` — wrong URL or the object doesn't exist;
+  - `500 Internal Server Error` — the server broke, the server is at fault;
+  - `502 Bad Gateway` / `503 Service Unavailable` — the service is unavailable.
+
+  How to remember the difference between `401` and `403`: `401` is “show your pass”, `403` is “I see your pass, but you can't go in here”.
+
+  > 💡 **Why this matters in support:** the rule is simple — **check `4xx` on your side, escalate `5xx`**. That's already half of the diagnosis.
+
+  ## 1.6. JSON in 5 minutes
+
+  Request and response bodies are most often written in **JSON** (pronounced “jay-son”). It's a way of writing data that both people and programs understand the same way.
+
+  ```json
+  {
+    "ticket_id": "123",
+    "status": "open",
+    "priority": 2,
+    "urgent": true,
+    "tags": ["billing", "mobile"]
+  }
+  ```
+
+  The rules you need:
+
+  - the whole object goes in curly braces `{ }`;
+  - data is written as **`"key": value`** pairs, with a colon between key and value;
+  - **keys always go in double quotes**: `"status"`, not `status`;
+  - pairs are separated by commas, but **there is no comma after the last pair**;
+  - a list goes in square brackets `[ ]`;
+  - a nested object goes in curly braces `{ }` again.
+
+  Values come in different types:
+
+  | Type | Example | Important |
+  |---|---|---|
+  | String | `"open"`, `"123"` | Always in **double** quotes |
+  | Number | `2`, `3.5` | No quotes |
+  | Yes / no | `true`, `false` | No quotes, lowercase |
+  | Empty | `null` | No quotes |
+  | List | `["a", "b"]` | In square brackets |
+
+  Note: `"123"` and `123` are **different things**. The first is a string (text made of digits), the second is a number. If the server expects a string and gets a number, it may reply with an error.
+
+  The most common mistakes that make the server reply `400 Bad Request`:
+
+  ```
+  {"status": open}          ← a word without quotes: open is not a string, a number or true
+  {'status': 'open'}        ← single quotes instead of double quotes
+  {"status": "open",}       ← an extra comma at the end
+  {"status": "open" "id": 1} ← a missing comma between pairs
+  ```
+
+  > 💡 **Why this matters in support:** when a user sends “here's my request”, you need to see quickly that the JSON is broken. That's a ready answer for the ticket.
+
+  ## 1.7. The first headers you'll meet
+
+  **`Content-Type`** — “what format the body is in”. The value `application/json` tells the server: “there's JSON inside, parse it as JSON”.
+
+  What happens if you forget it? The server gets the body but doesn't realise it's JSON. It may read it as plain text, ignore it, or reply with an error (often `400` or `415 Unsupported Media Type`). So the rule is: **if you send JSON in the body, add `Content-Type: application/json`**.
+
+  **`Accept`** — “which format I want the response in”. For example, `Accept: application/json`.
+
+  **`Authorization`** — the “pass”. The server doesn't know who is calling it, so the request carries a **token** — a long secret string the server issued when you logged in. Most often it looks like this:
+
+  ```
+  Authorization: Bearer eyJhbGciOiJIUzI1NiIs...
+  ```
+
+  `Bearer` means “the holder”: whoever presents the token is treated by the server as its owner.
+
+  ## 1.8. Security: tokens and production
+
+  A token is the **key to an account**. Anyone who has it can act on the user's behalf: view their data, create and delete tickets. So:
+
+  - **never paste a real token** into screenshots, tickets, chats or practice requests;
+  - if you need to show a request to a colleague, replace the token with `***`;
+  - if a token has leaked by accident, report it so it can be revoked.
+
+  **Production** (prod, the live environment) is the real system that real customers use. There is also a **test environment** (called test, stage or sandbox) — a copy for experiments.
+
+  Why you can't “just check” on production: a `POST` request will create a **real** ticket, `DELETE` will remove **real** data, and it may be impossible to undo. Test on the test environment; on production, only read (`GET`) and only if that's allowed.
+
+  > ⚠️ **This course uses test data only.** The trainer is a sandbox: you can't break anything here.
+
+  ## 1.9. Where you'll practise
+
+  ### The mini-Postman
+
+  On the right of this page (below it on a phone) there's a **mini-Postman** — a simplified copy of the real one. It works the same way:
+
+  1. The **request line** at the top: the method (`GET`, `POST`…), the address and the **Send** button.
+  2. The **tabs** below it:
+     - **Params** — query parameters as a table; whatever you type here automatically appears in the address after `?`;
+     - **Headers** — headers;
+     - **Body** — the body. `none` — no body, `raw JSON` — a field for JSON. If the JSON is broken, a red hint appears under the field;
+     - **Console** — a log: what exactly was sent to the server and what came back.
+  3. The **response** at the bottom: the status code (coloured: green — 2xx, yellow — 4xx, red — 5xx), the time, the size and the response body.
+
+  **The address is always full.** The practice server runs on this same site, so the tasks give its full address: `{{BASE_URL}}/api/echo`. The protocol is `http://` or `https://`, the host is the site's address, the path is `/api/echo` (see section 1.3). The mini-Postman puts this address into the request line for you.
+
+  If you type only the path, `/api/echo`, the mini-Postman fills in the protocol and host itself — just like a browser does. That won't work in the real Postman: there the address is **always** written in full, otherwise the request goes nowhere. So get used to the full address right away.
+
+  To start a task, press **“Solve”** on its card. After each **Send**, the trainer checks the server's response and shows whether you got it right. If not, it hints what to fix.
+
+  ### The echo practice server
+
+  Almost all tasks send requests to `{{BASE_URL}}/api/echo`. This is an **echo server**: it saves nothing and simply **returns everything it received**. That way you can see with your own eyes how the server “sees” your request:
+
+  - `method` — which method the request came with;
+  - `args` — the query parameters from the address;
+  - `headers` — the headers (the server lowercases the names: `Content-Type` → `content-type`);
+  - `json` — the body, if it was valid JSON.
+
+  Important: when echo replies `200` to a `POST`, it **doesn't mean anything was created**. It means “I received this” — and shows exactly what.
+
+  There's also `{{BASE_URL}}/api/status/<code>`: it simply replies with the status code you put in the address. For example, `{{BASE_URL}}/api/status/404` always returns `404`. That way you can look at errors without breaking anything.
+
+  ### The real Postman (a look ahead)
+
+  In the next chapters you'll move to the real Postman. It has the same tabs and the same logic, plus:
+
+  - **Workspace** — the space where your requests live;
+  - **Collection** — a folder for saved requests, so you don't have to rebuild them;
+  - **Authorization** — a separate tab for tokens;
+  - **Postman Console** — opens with `Ctrl+Alt+C` (`Cmd+Option+C` on Mac) or via the menu `View → Show Postman Console`.
+
+  > 💡 **Why this matters in support:** the Console is the main diagnostic tool. It shows the request as it was actually sent. If something is unclear, open the Console first.
+
+  ## Glossary
+
+  | Term | In plain words |
+  |---|---|
+  | Client | A program that sends a request (browser, app, Postman) |
+  | Server | A program that receives the request and replies |
+  | API | A set of addresses and rules programs use to communicate |
+  | HTTP | The “language” of requests and responses on the internet |
+  | Endpoint | A specific API address, for example `/api/tickets` |
+  | Method | What to do: `GET`, `POST`, `PUT`, `PATCH`, `DELETE` |
+  | Query parameter | A refinement in the address after `?`: `?status=open` |
+  | Header | Extra information about a request: `Content-Type: application/json` |
+  | Body | The data inside a request or response |
+  | JSON | A data format: `{"key": "value"}` |
+  | Status code | A three-digit number in the response: `200`, `404`, `500` |
+  | Token | A secret “pass” to an account |
+  | Production | The real system with real customers |

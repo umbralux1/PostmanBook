@@ -1,0 +1,121 @@
+{# Мини-Postman. Логика — static/js/builder.js #}
+<div x-data="builder" class="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+  <div class="flex items-center justify-between border-b border-slate-100 px-4 py-2 bg-slate-50">
+    <div class="text-sm font-semibold text-slate-700">{{ _("Мини-Postman") }}</div>
+    <div class="text-xs text-slate-500 truncate ml-3">
+      <template x-if="$store.task.id">
+        <span>{{ _("Задание:") }} <b class="text-slate-700" x-text="$store.task.title"></b></span>
+      </template>
+      <template x-if="!$store.task.id"><span>{{ _("Свободный режим — выбери задание слева") }}</span></template>
+    </div>
+  </div>
+
+  {# --- Строка запроса --- #}
+  <form class="flex gap-2 p-3" @submit.prevent="send()">
+    <select x-model="method" :class="ring('method')"
+            class="rounded-lg border border-slate-300 bg-white px-2 py-2 text-sm font-semibold text-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-300">
+      <template x-for="m in methods" :key="m"><option :value="m" x-text="m"></option></template>
+    </select>
+    <input x-model="url" @input="syncParamsFromUrl()" :class="ring('url')"
+           class="code-area min-w-0 flex-1 rounded-lg border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-300"
+           :placeholder="location.origin + '/api/echo?source=postman'" spellcheck="false" autocomplete="off">
+    <button type="submit" :disabled="sending"
+            class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60">
+      <span x-text="sending ? '…' : 'Send'"></span>
+    </button>
+  </form>
+
+  {# --- Вкладки запроса --- #}
+  <div class="flex gap-1 border-b border-slate-100 px-3 text-sm">
+    <button type="button" @click="tab='params'" :class="[tab==='params' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-500', ring('params')]" class="border-b-2 px-3 py-2 rounded-t">
+      Params <span class="text-xs text-slate-400" x-show="activeParamCount()" x-text="'(' + activeParamCount() + ')'"></span>
+    </button>
+    <button type="button" @click="tab='headers'" :class="[tab==='headers' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-500', ring('headers')]" class="border-b-2 px-3 py-2 rounded-t">
+      Headers <span class="text-xs text-slate-400" x-show="activeHeaderCount()" x-text="'(' + activeHeaderCount() + ')'"></span>
+    </button>
+    <button type="button" @click="tab='body'" :class="[tab==='body' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-500', ring('body')]" class="border-b-2 px-3 py-2 rounded-t">
+      Body <span class="text-xs text-rose-500" x-show="bodyError">●</span>
+    </button>
+    <button type="button" @click="openConsole()" :class="[tab==='console' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-500', ring('console')]" class="border-b-2 px-3 py-2 rounded-t">
+      Console <span class="text-xs text-slate-400" x-show="log.length" x-text="'(' + log.length + ')'"></span>
+    </button>
+  </div>
+
+  <div class="p-3 min-h-[150px]">
+    {# Params #}
+    <div x-show="tab==='params'">
+      <p class="text-xs text-slate-500 mb-2">{{ _("Query-параметры добавляются в URL после ?.") }}</p>
+      <table class="w-full text-sm">
+        <thead><tr class="text-left text-xs text-slate-400"><th class="pb-1 font-normal">Key</th><th class="pb-1 font-normal">Value</th><th></th></tr></thead>
+        <tbody>
+          <template x-for="(p, i) in params" :key="i">
+            <tr>
+              <td class="pr-2 py-0.5"><input x-model="p.key" @input="syncUrlFromParams()" class="code-area w-full rounded border border-slate-200 px-2 py-1" placeholder="key"></td>
+              <td class="pr-2 py-0.5"><input x-model="p.value" @input="syncUrlFromParams()" class="code-area w-full rounded border border-slate-200 px-2 py-1" placeholder="value"></td>
+              <td class="w-6"><button type="button" x-show="p.key || p.value" @click="removeParam(i)" class="text-slate-400 hover:text-rose-500" title="{{ _('Удалить') }}">✕</button></td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+    </div>
+
+    {# Headers #}
+    <div x-show="tab==='headers'" x-cloak>
+      <datalist id="header-names"><template x-for="h in headerNames"><option :value="h"></option></template></datalist>
+      <table class="w-full text-sm">
+        <thead><tr class="text-left text-xs text-slate-400"><th class="pb-1 font-normal">Key</th><th class="pb-1 font-normal">Value</th><th></th></tr></thead>
+        <tbody>
+          <template x-for="(h, i) in headers" :key="i">
+            <tr>
+              <td class="pr-2 py-0.5"><input x-model="h.key" @input="onHeaderInput()" list="header-names" class="code-area w-full rounded border border-slate-200 px-2 py-1" placeholder="Content-Type"></td>
+              <td class="pr-2 py-0.5">
+                <input x-model="h.value" @input="onHeaderInput()" :list="'hv-' + i" class="code-area w-full rounded border border-slate-200 px-2 py-1" placeholder="application/json">
+                <datalist :id="'hv-' + i"><template x-for="v in headerValueOptions(h.key)"><option :value="v"></option></template></datalist>
+              </td>
+              <td class="w-6"><button type="button" x-show="h.key || h.value" @click="removeHeader(i)" class="text-slate-400 hover:text-rose-500" title="{{ _('Удалить') }}">✕</button></td>
+            </tr>
+          </template>
+          <tr x-show="$store.task.id" class="text-slate-400">
+            <td class="pr-2 py-1 code-area">X-Task-Code</td>
+            <td class="pr-2 py-1 code-area" x-text="$store.task.id"></td>
+            <td title="{{ _('Служебный заголовок: по нему тренажёр понимает, к какому заданию относится запрос') }}">🔒</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    {# Body #}
+    <div x-show="tab==='body'" x-cloak>
+      <div class="flex items-center gap-4 text-sm mb-2">
+        <label class="flex items-center gap-1"><input type="radio" value="none" x-model="bodyMode" class="accent-indigo-600"> none</label>
+        <label class="flex items-center gap-1"><input type="radio" value="json" x-model="bodyMode" class="accent-indigo-600"> raw JSON</label>
+        <button type="button" x-show="bodyMode==='json' && !bodyError && body.trim()" @click="prettify()" class="ml-auto text-xs text-indigo-600 hover:underline">{{ _("Выровнять") }}</button>
+      </div>
+      <template x-if="bodyMode==='json'">
+        <div>
+          <div class="relative">
+            <pre aria-hidden="true" class="code-area pointer-events-none absolute inset-0 m-0 overflow-hidden whitespace-pre-wrap break-words rounded-lg border border-transparent px-3 py-2" x-html="body ? highlightJson(body) + '\n' : ''"></pre>
+            <textarea x-model="body" rows="8" spellcheck="false"
+                      class="code-area relative w-full resize-y rounded-lg border bg-transparent px-3 py-2 text-transparent caret-slate-800 focus:outline-none focus:ring-2"
+                      :class="bodyError ? 'border-rose-300 focus:ring-rose-200' : 'border-slate-300 focus:ring-indigo-300'"
+                      placeholder='{"ticket_id": "123"}'></textarea>
+          </div>
+          <p x-show="bodyError" class="mt-1 text-xs text-rose-600">{{ _("Ошибка JSON:") }} <span x-text="bodyError"></span></p>
+          <p x-show="!bodyError && body.trim()" class="mt-1 text-xs text-emerald-600">{{ _("JSON корректный") }}</p>
+          <p class="mt-1 text-xs text-slate-500">{{ _("Подсказка: для JSON-тела обычно нужен заголовок Content-Type: application/json.") }}</p>
+        </div>
+      </template>
+      <p x-show="bodyMode==='none'" class="text-sm text-slate-500">{{ _("Запрос уйдёт без тела.") }}</p>
+    </div>
+
+    {# Console #}
+    <div x-show="tab==='console'" x-cloak>
+      {% include "components/console.html" %}
+    </div>
+  </div>
+
+  <p x-show="error" x-cloak class="mx-3 mb-3 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700" x-text="error"></p>
+
+  {% include "components/hint.html" %}
+  {% include "components/response_panel.html" %}
+</div>

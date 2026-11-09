@@ -1,0 +1,33 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: trainer
+      POSTGRES_USER: trainer
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-trainer}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U trainer -d trainer"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  app:
+    build: .
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      TRAINER_DATABASE_URL: postgresql+psycopg://trainer:${POSTGRES_PASSWORD:-trainer}@db:5432/trainer
+      TRAINER_AUTO_CREATE_TABLES: "false"
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  pgdata:

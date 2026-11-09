@@ -1,0 +1,37 @@
+[x-cloak] { display: none !important; }
+
+.j-key { color: #7c3aed; }
+.j-str { color: #047857; }
+.j-num { color: #b45309; }
+.j-lit { color: #be123c; font-weight: 600; }
+
+.code-area {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.5;
+  tab-size: 2;
+}
+
+/* Оформление Markdown-контента главы */
+.prose-trainer h2 { font-size: 1.35rem; font-weight: 700; margin: 2rem 0 .75rem; color: #0f172a; }
+.prose-trainer h3 { font-size: 1.1rem; font-weight: 600; margin: 1.5rem 0 .5rem; }
+.prose-trainer p { margin: .6rem 0; line-height: 1.7; color: #334155; }
+.prose-trainer ul, .prose-trainer ol { margin: .5rem 0 .5rem 1.4rem; color: #334155; }
+.prose-trainer ul { list-style: disc; }
+.prose-trainer ol { list-style: decimal; }
+.prose-trainer li { margin: .2rem 0; line-height: 1.6; }
+.prose-trainer code { background: #f1f5f9; padding: .1rem .35rem; border-radius: .3rem; font-size: .88em; color: #0f172a; }
+.prose-trainer pre { background: #0f172a; color: #e2e8f0; padding: .9rem 1rem; border-radius: .6rem; overflow-x: auto; margin: .8rem 0; font-size: 13px; }
+.prose-trainer pre code { background: transparent; color: inherit; padding: 0; }
+.prose-trainer blockquote { border-left: 4px solid #6366f1; background: #eef2ff; padding: .6rem 1rem; border-radius: 0 .5rem .5rem 0; margin: .9rem 0; }
+.prose-trainer blockquote p { margin: .2rem 0; color: #1e1b4b; }
+.prose-trainer table { border-collapse: collapse; margin: .8rem 0; font-size: .92rem; width: 100%; }
+.prose-trainer th, .prose-trainer td { border: 1px solid #e2e8f0; padding: .4rem .6rem; text-align: left; vertical-align: top; }
+.prose-trainer th { background: #f8fafc; font-weight: 600; }
+.prose-trainer strong { color: #0f172a; }
+
+/* Раскрывающиеся ответы «Проверь себя» */
+.prose-trainer details { margin: .8rem 0; border: 1px solid #d1fae5; background: #f0fdf4; border-radius: .6rem; padding: .5rem .9rem; }
+.prose-trainer details summary { cursor: pointer; font-weight: 600; color: #047857; }
+.prose-trainer details[open] summary { margin-bottom: .3rem; }
+.prose-trainer details p, .prose-trainer details li { color: #14532d; }

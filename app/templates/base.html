@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="{{ lang }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{{ _(settings.app_name) }}{% endblock %}</title>
+  <link rel="icon" href="{{ url_for('static', path='favicon.svg') }}" type="image/svg+xml">
+  <link rel="stylesheet" href="{{ url_for('static', path='css/tailwind.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', path='css/app.css') }}">
+  <script src="{{ url_for('static', path='js/vendor/htmx.min.js') }}" defer></script>
+  <script>window.I18N = {{ js_catalog | tojson }};</script>
+  <script src="{{ url_for('static', path='js/i18n.js') }}"></script>
+  <script src="{{ url_for('static', path='js/json-highlight.js') }}"></script>
+  <script src="{{ url_for('static', path='js/checker.js') }}"></script>
+  <script src="{{ url_for('static', path='js/builder.js') }}"></script>
+  <script src="{{ url_for('static', path='js/vendor/alpine.min.js') }}" defer></script>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased">
+  <header class="bg-white border-b border-slate-200">
+    <div class="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between gap-4">
+      <a href="/" class="flex items-center gap-2 font-semibold text-slate-900">
+        <span class="inline-flex h-7 w-7 items-center justify-center rounded-md bg-indigo-600 text-white text-xs font-bold">HTTP</span>
+        {{ _(settings.app_name) }}
+      </a>
+      <div class="flex items-center gap-3 text-sm">
+        {% block header_right %}{% endblock %}
+        <nav class="flex rounded-md border border-slate-200 text-xs font-semibold overflow-hidden" aria-label="{{ _('Язык') }}">
+          {% for code in languages %}
+          <a href="/lang/{{ code }}?next={{ request.url.path | urlencode }}"
+             class="px-2 py-1 {% if code == lang %}bg-indigo-600 text-white{% else %}text-slate-500 hover:bg-slate-50{% endif %}"
+             {% if code == lang %}aria-current="true"{% endif %}>{{ code | upper }}</a>
+          {% endfor %}
+        </nav>
+      </div>
+    </div>
+  </header>
+  <main class="max-w-7xl mx-auto px-4 py-6">
+    {% block content %}{% endblock %}
+  </main>
+  <footer class="max-w-7xl mx-auto px-4 py-8 text-xs text-slate-400">
+    {{ _("Учебная песочница. Не отправляйте сюда реальные токены и данные с production.") }}
+  </footer>
+</body>
+</html>

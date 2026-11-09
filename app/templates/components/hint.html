@@ -1,0 +1,35 @@
+{# Результат проверки задания (считается в static/js/checker.js по ответу сервера) #}
+<template x-if="validation">
+  <div class="mx-3 mb-3">
+    <template x-if="validation?.passed">
+      <div class="rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-2 text-sm text-emerald-800">
+        ✅ <b>{{ _("Задание выполнено!") }}</b> {{ _("Сервер вернул именно то, что нужно. Можно переходить к следующему.") }}
+      </div>
+    </template>
+    <template x-if="validation && !validation.passed">
+      <div class="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-sm text-amber-900">
+        <div class="font-semibold" x-text="validation?.waitingConsole ? t('Почти готово') : t('Пока не совсем так')"></div>
+        <template x-if="validation?.total > 1">
+          <div class="text-xs mt-0.5"><span x-text="t('Выполнено шагов: {done} из {total}', {done: validation?.done, total: validation?.total})"></span></div>
+        </template>
+        <p class="mt-1" x-show="validation?.hint" x-text="validation?.hint"></p>
+      </div>
+    </template>
+    <details class="mt-1 text-xs text-slate-500" x-show="validation?.results?.length">
+      <summary class="cursor-pointer">{{ _("Что проверялось в ответе") }}</summary>
+      <ul class="mt-1 space-y-0.5">
+        <template x-for="r in (validation?.results || [])" :key="r.path + r.op">
+          <li>
+            <span x-text="r.ok ? '✓' : '✗'" :class="r.ok ? 'text-emerald-600' : 'text-rose-600'"></span>
+            <span class="code-area" x-text="r.path"></span>
+            <span x-text="{equals: '=', contains: t('содержит'), exists: r.expected ? t('есть') : t('нет'), in: t('одно из')}[r.op]"></span>
+            <span class="code-area" x-show="r.op !== 'exists'" x-text="JSON.stringify(r.expected)"></span>
+            <template x-if="!r.ok && r.op !== 'exists'">
+              <span class="text-rose-600">— <span x-show="r.found">{{ _("пришло") }} <span class="code-area" x-text="JSON.stringify(r.actual)"></span></span><span x-show="!r.found">{{ _("такого поля в ответе нет") }}</span></span>
+            </template>
+          </li>
+        </template>
+      </ul>
+    </details>
+  </div>
+</template>

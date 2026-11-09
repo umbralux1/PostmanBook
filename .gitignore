@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+*.db
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.idea/
+node_modules/
+*.egg-info/
+build/
+dist/
+
+# временные файлы переноса проекта
+_to_delete/

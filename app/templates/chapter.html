@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}{{ chapter.title }} — {{ _(settings.app_name) }}{% endblock %}
+{% block header_right %}
+  <span class="text-slate-500 hidden sm:inline">{{ _("Глава {n}", n=chapter.order) }}</span>
+  <span hx-get="/partials/progress/{{ chapter.id }}" hx-trigger="progress-changed from:body" hx-swap="innerHTML">
+    {% with done=done, total=tasks|length %}{% include "components/progress_badge.html" %}{% endwith %}
+  </span>
+{% endblock %}
+
+{% block content %}
+<div x-data x-init="{% for t in tasks %}{% if t.id in passed %}$store.task.passed['{{ t.id }}'] = true;{% endif %}{% endfor %}"
+     class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,560px)]">
+
+  {# ---------- Левая колонка: теория и задания ---------- #}
+  <div class="min-w-0">
+    <a href="/" class="text-sm text-indigo-600 hover:underline">← {{ _("Все главы") }}</a>
+    <h1 class="mt-2 text-2xl font-bold text-slate-900">{{ chapter.title }}</h1>
+    {% if chapter.meta.estimated_minutes %}
+      <p class="text-sm text-slate-500 mt-1">{{ _("Примерно {n} минут", n=chapter.meta.estimated_minutes) }}</p>
+    {% endif %}
+
+    {% if chapter.meta.goal %}
+    <div class="mt-4 rounded-xl bg-indigo-50 border border-indigo-100 p-4 text-sm">
+      <div class="font-semibold text-indigo-900">{{ _("Цель главы") }}</div>
+      <p class="mt-1 text-indigo-900/80 whitespace-pre-line">{{ chapter.meta.goal }}</p>
+      {% if chapter.meta.after_completion %}
+        <p class="mt-2 text-indigo-900/70 whitespace-pre-line">{{ chapter.meta.after_completion }}</p>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    <article class="prose-trainer mt-4 rounded-xl bg-white border border-slate-200 p-6">
+      {{ chapter.content_md | md }}
+    </article>
+
+    <h2 class="mt-8 text-xl font-bold text-slate-900">{{ _("Задания") }}</h2>
+    <p class="text-sm text-slate-500 mt-1">{{ _("Нажми «Решать», собери запрос в мини-Postman и отправь. Проверка — автоматическая.") }}</p>
+    <div class="mt-4 space-y-3">
+      {% for task in tasks %}
+        {% include "components/task_card.html" %}
+      {% endfor %}
+    </div>
+
+    {% if chapter.meta.checklist %}
+    <section class="mt-10 rounded-xl bg-white border border-slate-200 p-6"
+             x-data="checklist('checklist-{{ chapter.id }}')">
+      <h2 class="text-xl font-bold text-slate-900">{{ _("Чек-лист главы") }}</h2>
+      <p class="text-sm text-slate-500">{{ _("Отметь то, в чём уверен(а). Отметки хранятся только в этом браузере.") }}</p>
+      <ul class="mt-3 space-y-2">
+        {% for item in chapter.meta.checklist %}
+        <li>
+          <label class="flex items-start gap-3 cursor-pointer">
+            <input type="checkbox" class="mt-1 h-4 w-4 accent-emerald-600"
+                   x-model="done['{{ loop.index }}']"
+                   @change="save()">
+            <span class="text-slate-700">{{ item }}</span>
+          </label>
+        </li>
+        {% endfor %}
+      </ul>
+    </section>
+    {% endif %}
+
+    {% if quiz %}
+    <section class="mt-6 rounded-xl bg-white border border-slate-200 p-6">
+      <div class="flex items-center justify-between">
+        <h2 class="text-xl font-bold text-slate-900">{{ _("Тест главы") }}</h2>
+        {% if quiz_passed %}<span class="text-sm text-emerald-700">{{ _("✓ уже сдан") }}</span>{% endif %}
+      </div>
+      <form class="mt-4 space-y-5" hx-post="/chapters/{{ chapter.id }}/quiz" hx-target="#quiz-result" hx-swap="innerHTML">
+        {% for q in quiz %}
+        <fieldset>
+          <legend class="font-medium text-slate-900">{{ loop.index }}. {{ q.question | mdi }}</legend>
+          <div class="mt-2 grid gap-2">
+            {% for key, text in q.options.items() %}
+            <label class="flex items-center gap-3 rounded-lg border border-slate-200 px-3 py-2 hover:bg-slate-50 cursor-pointer">
+              <input type="radio" name="{{ q.id }}" value="{{ key }}" required class="accent-indigo-600">
+              <span><b>{{ key }}.</b> {{ text | mdi }}</span>
+            </label>
+            {% endfor %}
+          </div>
+        </fieldset>
+        {% endfor %}
+        <button class="rounded-lg bg-indigo-600 px-4 py-2 text-white font-medium hover:bg-indigo-700">{{ _("Проверить ответы") }}</button>
+      </form>
+      <div id="quiz-result" class="mt-4"></div>
+    </section>
+    {% endif %}
+  </div>
+
+  {# ---------- Правая колонка: мини-Postman ---------- #}
+  <aside class="min-w-0">
+    <div id="builder" class="lg:sticky lg:top-4">
+      {% include "components/request_builder.html" %}
+    </div>
+  </aside>
+</div>
+{% endblock %}
