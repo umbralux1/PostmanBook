@@ -1,8 +1,9 @@
-"""Утилиты командной строки: `python -m app.cli check-content`."""
+"""Утилиты командной строки: `python -m app.cli check-content | sync-content | reset-progress`."""
 
 import sys
 
 from pydantic import ValidationError
+from sqlmodel import Session, col, delete, func, select
 
 from app.config import get_settings
 from app.services.task_loader import (
@@ -52,8 +53,6 @@ def sync_content_cmd() -> int:
     """Загрузить главы и задания из YAML в БД (без перезапуска приложения)."""
     if check_content() != 0:
         return 1
-    from sqlmodel import Session
-
     from app.db import get_engine, prepare_database
     from app.services.task_loader import sync_content
 
@@ -66,12 +65,45 @@ def sync_content_cmd() -> int:
     return 0
 
 
+def reset_progress(session: Session) -> int:
+    """Удалить попытки всех пользователей (задания и тесты глав). Вернуть, сколько удалено."""
+    from app.models import Attempt
+
+    count = session.exec(select(func.count(col(Attempt.id)))).one()
+    session.exec(delete(Attempt))
+    session.commit()
+    return count
+
+
+def reset_progress_cmd(argv: list[str]) -> int:
+    """Сбросить прогресс всех пользователей. Без --yes спрашивает подтверждение."""
+    from app.db import get_engine, prepare_database
+
+    settings = get_settings()
+    if "--yes" not in argv:
+        answer = input(f"Удалить прогресс ВСЕХ пользователей в {settings.database_url}? [y/N] ")
+        if answer.strip().lower() not in ("y", "yes", "д", "да"):
+            print("Отменено.")
+            return 1
+    engine = get_engine()
+    prepare_database(engine, settings.database_url)
+    with Session(engine) as session:
+        removed = reset_progress(session)
+    print(f"Прогресс сброшен: удалено попыток — {removed}. Обнови страницу в браузере.")
+    return 0
+
+
 def main(argv: list[str]) -> int:
     if argv[1:2] == ["check-content"]:
         return check_content()
     if argv[1:2] == ["sync-content"]:
         return sync_content_cmd()
-    print("Использование: python -m app.cli check-content | sync-content", file=sys.stderr)
+    if argv[1:2] == ["reset-progress"]:
+        return reset_progress_cmd(argv[2:])
+    print(
+        "Использование: python -m app.cli check-content | sync-content | reset-progress [--yes]",
+        file=sys.stderr,
+    )
     return 2
 
 

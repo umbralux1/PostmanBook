@@ -12,7 +12,7 @@ PORT   ?= 8000
 MSG    ?= changes
 
 .DEFAULT_GOAL := help
-.PHONY: help install env dev run test test-js cov lint format typecheck check content-check content-sync i18n-missing \
+.PHONY: help install env dev run test test-js cov lint format typecheck check content-check content-sync reset-progress i18n-missing \
         migrate migration css up up-d down logs docker-build docker-clean clean
 
 help: ## Показать список команд
@@ -107,3 +107,7 @@ docker-clean: ## Остановить контейнеры и удалить д�
 clean: ## Удалить кэши и локальную SQLite-базу
 	find . -name __pycache__ -type d -prune -not -path "./$(VENV)/*" -exec rm -rf {} +
 	rm -rf .pytest_cache .mypy_cache .ruff_cache *.egg-info trainer.db
+
+
+reset-progress: ## Сбросить прогресс ВСЕХ пользователей (спросит подтверждение; без вопроса: YES=1)
+	$(BIN)/python -m app.cli reset-progress $(if $(YES),--yes)
