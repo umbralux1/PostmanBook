@@ -53,7 +53,7 @@ def snapshot_from_request(request: Request, body: bytes) -> RequestSnapshot:
     for k, v in request.headers.items():
         key = k.lower()
         if key in _HIDDEN_HEADERS:
-            headers[key] = "***скрыто***"
+            headers[key] = "***"
         else:
             headers[key] = v
     return make_snapshot(

@@ -56,7 +56,7 @@ tasks:
         - {path: body.json.priority, in: [low, medium, high], hint: "priority must be one of: \"low\", \"medium\", \"high\"."}
 
   - id: ch02-task2
-    order: 2
+    order: 3
     title: "Headers"
     description_md: |
       In the same `POST` request, open the **Headers** tab and add:
@@ -91,7 +91,7 @@ tasks:
         - {path: body.json, exists: true, hint: "Keep the body from task 1."}
 
   - id: ch02-task3
-    order: 3
+    order: 5
     title: "Status codes in action"
     description_md: |
       Send three `GET` requests and write down the result of each:
@@ -130,7 +130,7 @@ tasks:
           - {path: body.status, equals: 500, hint: "The address must be exactly {{BASE_URL}}/api/status/500."}
 
   - id: ch02-task4
-    order: 4
+    order: 7
     title: "Console"
     description_md: |
       Send the `POST` request from task 1 again, then open the **Console**
@@ -174,7 +174,7 @@ tasks:
       console_hint: "The response is correct. Now click Console in the mini-Postman's bottom bar and find this request there."
 
   - id: ch02-task5
-    order: 5
+    order: 8
     title: "A mini ticket"
     description_md: |
       A user writes:
@@ -217,5 +217,194 @@ tasks:
         - - {path: status, equals: 400, hint: "First reproduce the error: the body exactly as the user sent it (high without quotes) and the Content-Type: application/json header. The server should reply 400."}
           - {path: body.error, equals: invalid_json, hint: "The server should reply with an invalid_json error — send the body exactly as the user did."}
         - - {path: status, equals: 200, hint: "Now fix the JSON: priority must be a string in quotes — \"high\"."}
+          - {path: body.json.title, exists: true, hint: "Don't lose the title field."}
+          - {path: body.json.priority, equals: high, hint: "priority must be the string \"high\"."}
+
+  - id: ch02-task6
+    order: 2
+    title: "Value types in JSON"
+    description_md: |
+      Send a `POST` request to `{{BASE_URL}}/api/echo` with the
+      `Content-Type: application/json` header and the body from section 2.3:
+
+      ```json
+      {
+        "ticket_id": "123",
+        "status": "open",
+        "priority": 2,
+        "urgent": true,
+        "tags": ["billing", "mobile"]
+      }
+      ```
+
+      Watch the quotes: this body has strings, a number, a yes/no value and a list.
+
+      **How to do it:** the method and header are the same as in task 1. In the **Body**
+      tab (**raw JSON**), replace the body with the JSON above and press **Send**.
+
+      **What you should see:** the `json` block of the response has the same values of the
+      same types: `"123"` in quotes, `2` and `true` without quotes, `tags` is a list.
+
+      **Ask yourself:** name the type of each field. How is `"ticket_id": "123"`
+      different from `"ticket_id": 123`?
+
+      <details markdown="1">
+      <summary>Check yourself</summary>
+
+      - `ticket_id` — a string (digits in quotes);
+      - `status` — a string;
+      - `priority` — a number (no quotes);
+      - `urgent` — yes/no (`true` without quotes);
+      - `tags` — a list of two strings.
+
+      `"123"` is a string, text made of digits, and `123` is a number. For the server
+      these are different values: if it expects a string and gets a number, it may reply
+      with an error. Likewise, `"true"` in quotes is no longer “yes” but a four-letter string.
+
+      </details>
+    expected:
+      response:
+        - {path: status, equals: 200, hint: "The server didn't reply 200. Check the address ({{BASE_URL}}/api/echo) and that the JSON has no mistakes — quotes and commas."}
+        - {path: body.method, equals: POST, hint: "Use the POST method, as in task 1."}
+        - {path: body.headers.content-type, contains: application/json, hint: "Add the Content-Type: application/json header."}
+        - {path: body.json, exists: true, hint: "The server didn't receive JSON. In the Body tab, choose raw JSON and paste the body from the task."}
+        - {path: body.json.ticket_id, equals: "123", hint: "ticket_id is a string: \"123\" in double quotes."}
+        - {path: body.json.status, equals: open, hint: "status is the string \"open\" in double quotes."}
+        - {path: body.json.priority, equals: 2, hint: "priority is a number: 2 without quotes. \"2\" in quotes is a string."}
+        - {path: body.json.urgent, equals: true, hint: "urgent is a yes value: true without quotes, in lowercase."}
+        - {path: body.json.tags, equals: [billing, mobile], hint: "tags is a list in square brackets: [\"billing\", \"mobile\"]."}
+
+  - id: ch02-task7
+    order: 4
+    title: "Accept and Authorization"
+    description_md: |
+      In the same `POST` request, add two more headers from section 2.4 in the
+      **Headers** tab:
+
+      - `Accept: application/json` — “I want the response in JSON”;
+      - `Authorization: Bearer test-token-123` — the “pass”. This is a training token,
+        not a real one.
+
+      **How to do it:** don't remove the previous headers or the body; type the new ones
+      into the next empty rows. Press **Send**, then open the **Console**.
+
+      **What you should see:**
+      - the `headers` block of the response has `accept: application/json`;
+      - it also has `authorization`, but with `***` instead of the token;
+      - in the Console, the sent request shows the full token.
+
+      **Ask yourself:** why did echo hide the token in its response? What does that mean
+      for Console screenshots you send to colleagues?
+
+      <details markdown="1">
+      <summary>Check yourself</summary>
+
+      A token is the key to an account (section 2.5). The training server received it but
+      doesn't show it in the response — it replaces it with `***`, and that's what you
+      should do too.
+
+      The Console shows the request exactly as it was sent — with the real token. So before
+      you send a Console screenshot or the request text to a ticket or chat, replace the
+      token with `***`.
+
+      </details>
+    expected:
+      response:
+        - {path: status, equals: 200, hint: "The server didn't reply 200. Check the address ({{BASE_URL}}/api/echo) and the JSON in the body."}
+        - {path: body.method, equals: POST, hint: "Use the POST request from the previous tasks."}
+        - {path: body.headers.content-type, contains: application/json, hint: "Don't remove the Content-Type: application/json header."}
+        - {path: body.headers.accept, equals: application/json, hint: "The response headers have no accept: application/json. Add an Accept header with the value application/json."}
+        - {path: body.headers.authorization, exists: true, hint: "The response headers have no authorization. Add an Authorization header with the value Bearer test-token-123."}
+      require_console: true
+      console_hint: "The headers arrived. Now press Console in the bottom bar of the mini-Postman and find Authorization in the request."
+
+  - id: ch02-task8
+    order: 6
+    title: "Codes to know by heart"
+    description_md: |
+      Task 5 covered `200`, `404` and `500`. Now look at the other codes from
+      section 2.2. Send four `GET` requests:
+
+      1. `GET {{BASE_URL}}/api/status/201`
+      2. `GET {{BASE_URL}}/api/status/401`
+      3. `GET {{BASE_URL}}/api/status/403`
+      4. `GET {{BASE_URL}}/api/status/503`
+
+      **How to do it:** as in task 5 — the `GET` method, **Body** `none`; change the number
+      in the address and press **Send**. The task is complete once all four have been sent.
+
+      For each code, decide:
+      - its group (`2xx`, `4xx`, `5xx`);
+      - what support does: all good, check on our side, or escalate.
+
+      **Ask yourself:** a user got `403`. Will logging in again help them?
+
+      <details markdown="1">
+      <summary>Check yourself</summary>
+
+      - `201` — `2xx`, the object was created, all good.
+      - `401` — `4xx`, the server doesn't know who you are: the token is missing, wrong
+        or expired. Check the token.
+      - `403` — `4xx`, the server knows who you are, but this user isn't allowed to do it.
+        Check the user's permissions.
+      - `503` — `5xx`, the service is unavailable. Collect the details and escalate.
+
+      Logging in again gives a new token — that helps with `401`. With `403` the token
+      is fine, the problem is permissions, so logging in again won't help.
+
+      </details>
+    # Four responses in any order.
+    expected:
+      steps:
+        - - {path: status, equals: 201, hint: "Send a GET to {{BASE_URL}}/api/status/201."}
+          - {path: body.status, equals: 201, hint: "Send a GET to {{BASE_URL}}/api/status/201."}
+        - - {path: status, equals: 401, hint: "Now send a GET to {{BASE_URL}}/api/status/401."}
+          - {path: body.status, equals: 401, hint: "The address must be exactly {{BASE_URL}}/api/status/401."}
+        - - {path: status, equals: 403, hint: "Now send a GET to {{BASE_URL}}/api/status/403."}
+          - {path: body.status, equals: 403, hint: "The address must be exactly {{BASE_URL}}/api/status/403."}
+        - - {path: status, equals: 503, hint: "Now send a GET to {{BASE_URL}}/api/status/503."}
+          - {path: body.status, equals: 503, hint: "The address must be exactly {{BASE_URL}}/api/status/503."}
+
+  - id: ch02-task9
+    order: 9
+    title: "A mini ticket: two JSON mistakes"
+    description_md: |
+      A user writes:
+
+      > “I'm creating a ticket, and the server replies `400 Bad Request`. Here's the body:
+      > `{'title': 'Cannot log in', 'priority': 'high',}`. What's wrong?”
+
+      **What to do:**
+
+      1. Send a `POST` to `{{BASE_URL}}/api/echo` with the `Content-Type: application/json`
+         header and the body **exactly as the user sent it**. The mini-Postman will
+         highlight the JSON error — press **Send** anyway.
+      2. Find **all** the mistakes in the body (there are two), fix them and send it again.
+
+      **What you should see:**
+      - the first request fails with `400`;
+      - the second one succeeds with `200`, and the `json` block has `title` and `priority`.
+
+      **Write a reply to the user** in 2–3 sentences, then compare it with the example.
+
+      <details markdown="1">
+      <summary>Example reply</summary>
+
+      > “There are two mistakes in the request body that make the JSON invalid, so the
+      > server returns `400 Bad Request`: the keys and strings use single quotes, and there's
+      > an extra comma after the last pair. The correct body is:
+      > `{"title": "Cannot log in", "priority": "high"}`.”
+
+      If you fix only one mistake, the JSON is still invalid — that's why it's important
+      to find them all.
+
+      </details>
+    # Two responses in order: first a 400 error, then a success.
+    expected:
+      ordered: true
+      steps:
+        - - {path: status, equals: 400, hint: "First reproduce the error: the body exactly as the user sent it (single quotes and a trailing comma) and the Content-Type: application/json header. The server should reply 400."}
+          - {path: body.error, equals: invalid_json, hint: "The server should reply with an invalid_json error — send the body exactly as the user did."}
+        - - {path: status, equals: 200, hint: "The JSON is still broken. Fix both mistakes: quotes must be double, and there's no comma after the last pair."}
           - {path: body.json.title, exists: true, hint: "Don't lose the title field."}
           - {path: body.json.priority, equals: high, hint: "priority must be the string \"high\"."}

@@ -84,3 +84,146 @@ tasks:
         - {path: body.args.user, equals: student, hint: "Пропал параметр user=student из задания 1 — верни его."}
         - {path: body.args.ticket_id, equals: "123", hint: "В args нет ticket_id=123. Добавь его во вкладке Params."}
         - {path: body.args.status, equals: open, hint: "В args нет status=open. Добавь его во вкладке Params."}
+
+  - id: ch01-task3
+    order: 3
+    title: "Разбери адрес на части"
+    description_md: |
+      В документации API написан адрес:
+
+      ```
+      https://api.example.com/tickets?status=open&limit=10
+      ```
+
+      Это чужой сервер, на него запрос не отправить. Перенеси запрос на учебный
+      сервер: замени протокол, хост и путь на `{{BASE_URL}}/api/echo`, а
+      query-параметры оставь как в документации.
+
+      **Как сделать:**
+
+      1. Метод — `GET`.
+      2. В строке адреса оставь `{{BASE_URL}}/api/echo` и допиши после него
+         параметры из адреса выше — всё, что начинается с `?`.
+      3. Нажми **Send**.
+
+      **Что должно быть:** статус `200`, в блоке `args` ответа —
+      `"status": "open"` и `"limit": "10"`.
+
+      **Ответь себе:** какие в адресе из документации протокол, хост, путь
+      и query-параметры?
+
+      <details markdown="1">
+      <summary>Проверь себя</summary>
+
+      - протокол — `https://`;
+      - хост — `api.example.com`;
+      - путь — `/tickets`;
+      - query-параметры — `status=open` и `limit=10`.
+
+      Ты заменил протокол, хост и путь, а параметры перенёс без изменений —
+      поэтому echo показал в `args` те же два параметра.
+
+      </details>
+    expected:
+      response:
+        - {path: status, equals: 200, hint: "Сервер не ответил 200. Запрос должен идти на {{BASE_URL}}/api/echo."}
+        - {path: body.path, equals: /api/echo, hint: "Путь должен быть /api/echo: протокол, хост и путь замени на {{BASE_URL}}/api/echo."}
+        - {path: body.method, equals: GET, hint: "Здесь только читаем данные — нужен метод GET."}
+        - {path: body.args.status, equals: open, hint: "В args нет status=open. Перенеси параметры из адреса документации: всё после ?."}
+        - {path: body.args.limit, equals: "10", hint: "В args нет limit=10. Второй параметр добавляется через &: ?status=open&limit=10"}
+
+  - id: ch01-task4
+    order: 4
+    title: "Сломанные адреса"
+    description_md: |
+      Два пользователя прислали адреса, с которыми «ничего не работает»:
+
+      1. `{{BASE_URL}}/api/echo?source=postman?user=student`
+      2. `{{BASE_URL}}/api/echosource=postman`
+
+      Отправь каждый адрес методом `GET` **ровно как у пользователя** и посмотри,
+      что ответит сервер. Потом отправь исправленный адрес, в котором есть оба
+      параметра: `source=postman` и `user=student`.
+
+      **Что должно быть:**
+      - для адреса 1 — статус `200`, но в `args` только **один** параметр
+        `source` со странным значением;
+      - для адреса 2 — статус `404`;
+      - для исправленного адреса — `200` и в `args` оба параметра.
+
+      Задание засчитается, когда будут отправлены все три адреса.
+
+      **Ответь себе:** что сломано в каждом адресе и почему сервер ответил
+      именно так?
+
+      <details markdown="1">
+      <summary>Проверь себя</summary>
+
+      - Адрес 1: второй `?` вместо `&`. Параметры начинаются с первого `?`,
+        а следующий `?` сервер считает частью значения: `source` получил
+        значение `postman?user=student`, а параметра `user` нет вовсе.
+        Сервер ответил `200`, потому что сам адрес правильный, — ошибка видна
+        только в `args`.
+      - Адрес 2: забыт `?`. Параметры слиплись с путём, и получился путь
+        `/api/echosource=postman`, которого на сервере нет, — отсюда `404`.
+      - Правильно: `{{BASE_URL}}/api/echo?source=postman&user=student`.
+
+      </details>
+    # Три ответа в любом порядке.
+    expected:
+      steps:
+        - - {path: status, equals: 200, hint: "Отправь адрес 1 ровно как у пользователя: {{BASE_URL}}/api/echo?source=postman?user=student"}
+          - {path: body.path, equals: /api/echo, hint: "Отправь адрес 1 ровно как у пользователя: {{BASE_URL}}/api/echo?source=postman?user=student"}
+          - {path: body.args.source, equals: "postman?user=student", hint: "Отправь адрес 1 ровно как у пользователя — со вторым ?: {{BASE_URL}}/api/echo?source=postman?user=student"}
+        - - {path: status, equals: 404, hint: "Отправь адрес 2 ровно как у пользователя — без ?: {{BASE_URL}}/api/echosource=postman"}
+          - {path: body.error, equals: not_found, hint: "Отправь адрес 2 ровно как у пользователя — без ?: {{BASE_URL}}/api/echosource=postman"}
+        - - {path: status, equals: 200, hint: "Теперь отправь исправленный адрес: {{BASE_URL}}/api/echo и параметры source=postman и user=student."}
+          - {path: body.path, equals: /api/echo, hint: "Исправленный адрес должен вести на {{BASE_URL}}/api/echo."}
+          - {path: body.args.source, equals: postman, hint: "В исправленном адресе source должен быть просто postman. Параметры разделяются &, а не вторым ?."}
+          - {path: body.args.user, equals: student, hint: "В исправленном адресе нет user=student. Второй параметр добавляется через &."}
+
+  - id: ch01-task5
+    order: 5
+    title: "Мини-тикет: фильтр не работает"
+    description_md: |
+      Пользователь пишет:
+
+      > «Хочу получить только открытые заявки, отправляю
+      > `GET {{BASE_URL}}/api/echo?stauts=open`, но фильтр не работает.»
+
+      **Что сделать:**
+
+      1. Отправь запрос **ровно как у пользователя** и посмотри на блок `args`
+         в ответе.
+      2. Найди ошибку, исправь адрес и отправь снова.
+
+      **Что должно быть:**
+      - в первом ответе в `args` есть параметр, но с неправильным ключом;
+      - во втором — `"status": "open"`.
+
+      **Сформулируй ответ пользователю** в 1–2 предложениях, потом сравни
+      с примером.
+
+      <details markdown="1">
+      <summary>Пример ответа</summary>
+
+      > «В адресе опечатка в названии параметра: `stauts` вместо `status`.
+      > Сервер не знает параметра `stauts` и не применяет фильтр. Отправьте
+      > запрос так: `?status=open`.»
+
+      Сервер не ответил ошибкой: статус `200`, параметр дошёл. Но ключ
+      с опечаткой — это для сервера совсем другой параметр. Поэтому при жалобе
+      «фильтр не работает» первым делом сверяй ключи в URL.
+
+      </details>
+    # Два ответа по порядку: сначала как у пользователя, потом исправленный.
+    expected:
+      ordered: true
+      steps:
+        - - {path: status, equals: 200, hint: "Сначала отправь запрос ровно как у пользователя: {{BASE_URL}}/api/echo?stauts=open"}
+          - {path: body.path, equals: /api/echo, hint: "Сначала отправь запрос ровно как у пользователя: {{BASE_URL}}/api/echo?stauts=open"}
+          - {path: body.args.stauts, equals: open, hint: "Сначала воспроизведи запрос ровно как у пользователя — с опечаткой: ?stauts=open"}
+        - - {path: status, equals: 200, hint: "Запрос должен идти на {{BASE_URL}}/api/echo."}
+          - {path: body.path, equals: /api/echo, hint: "Запрос должен идти на {{BASE_URL}}/api/echo."}
+          - {path: body.args.status, equals: open, hint: "Теперь исправь ключ: проверь буквы в названии параметра — должно быть status=open."}
+          - {path: body.args.stauts, exists: false, hint: "Убери параметр с опечаткой stauts — оставь только status=open."}

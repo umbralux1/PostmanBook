@@ -83,3 +83,145 @@ tasks:
         - {path: body.args.user, equals: student, hint: "The user=student parameter from task 1 is missing — put it back."}
         - {path: body.args.ticket_id, equals: "123", hint: "args has no ticket_id=123. Add it in the Params tab."}
         - {path: body.args.status, equals: open, hint: "args has no status=open. Add it in the Params tab."}
+
+  - id: ch01-task3
+    order: 3
+    title: "Break an address into parts"
+    description_md: |
+      The API documentation shows this address:
+
+      ```
+      https://api.example.com/tickets?status=open&limit=10
+      ```
+
+      That's someone else's server, you can't send a request there. Move the request
+      to the training server: replace the protocol, host and path with
+      `{{BASE_URL}}/api/echo`, and keep the query parameters exactly as in the documentation.
+
+      **How to do it:**
+
+      1. Method — `GET`.
+      2. In the address bar, keep `{{BASE_URL}}/api/echo` and append the parameters
+         from the address above — everything that starts with `?`.
+      3. Press **Send**.
+
+      **What you should see:** status `200`, and in the `args` block of the response —
+      `"status": "open"` and `"limit": "10"`.
+
+      **Ask yourself:** what are the protocol, host, path and query parameters
+      in the address from the documentation?
+
+      <details markdown="1">
+      <summary>Check yourself</summary>
+
+      - protocol — `https://`;
+      - host — `api.example.com`;
+      - path — `/tickets`;
+      - query parameters — `status=open` and `limit=10`.
+
+      You replaced the protocol, host and path, and carried the parameters over
+      unchanged — so echo showed the same two parameters in `args`.
+
+      </details>
+    expected:
+      response:
+        - {path: status, equals: 200, hint: "The server didn't reply 200. The request must go to {{BASE_URL}}/api/echo."}
+        - {path: body.path, equals: /api/echo, hint: "The path must be /api/echo: replace the protocol, host and path with {{BASE_URL}}/api/echo."}
+        - {path: body.method, equals: GET, hint: "We're only reading data here — use the GET method."}
+        - {path: body.args.status, equals: open, hint: "args has no status=open. Carry over the parameters from the documentation address: everything after ?."}
+        - {path: body.args.limit, equals: "10", hint: "args has no limit=10. The second parameter is added with &: ?status=open&limit=10"}
+
+  - id: ch01-task4
+    order: 4
+    title: "Broken addresses"
+    description_md: |
+      Two users sent addresses that “don't work at all”:
+
+      1. `{{BASE_URL}}/api/echo?source=postman?user=student`
+      2. `{{BASE_URL}}/api/echosource=postman`
+
+      Send each address with the `GET` method **exactly as the user wrote it** and see
+      what the server replies. Then send a fixed address that has both parameters:
+      `source=postman` and `user=student`.
+
+      **What you should see:**
+      - for address 1 — status `200`, but `args` has only **one** parameter,
+        `source`, with a strange value;
+      - for address 2 — status `404`;
+      - for the fixed address — `200` and both parameters in `args`.
+
+      The task is complete once all three addresses have been sent.
+
+      **Ask yourself:** what is broken in each address, and why did the server reply
+      the way it did?
+
+      <details markdown="1">
+      <summary>Check yourself</summary>
+
+      - Address 1: a second `?` instead of `&`. Parameters start at the first `?`,
+        and the server treats the next `?` as part of the value: `source` got the value
+        `postman?user=student`, and there is no `user` parameter at all.
+        The server replied `200` because the address itself is valid — the error shows
+        only in `args`.
+      - Address 2: the `?` is missing. The parameters stuck to the path, producing
+        the path `/api/echosource=postman`, which doesn't exist on the server — hence `404`.
+      - Correct: `{{BASE_URL}}/api/echo?source=postman&user=student`.
+
+      </details>
+    # Three responses in any order.
+    expected:
+      steps:
+        - - {path: status, equals: 200, hint: "Send address 1 exactly as the user wrote it: {{BASE_URL}}/api/echo?source=postman?user=student"}
+          - {path: body.path, equals: /api/echo, hint: "Send address 1 exactly as the user wrote it: {{BASE_URL}}/api/echo?source=postman?user=student"}
+          - {path: body.args.source, equals: "postman?user=student", hint: "Send address 1 exactly as the user wrote it — with the second ?: {{BASE_URL}}/api/echo?source=postman?user=student"}
+        - - {path: status, equals: 404, hint: "Send address 2 exactly as the user wrote it — without ?: {{BASE_URL}}/api/echosource=postman"}
+          - {path: body.error, equals: not_found, hint: "Send address 2 exactly as the user wrote it — without ?: {{BASE_URL}}/api/echosource=postman"}
+        - - {path: status, equals: 200, hint: "Now send the fixed address: {{BASE_URL}}/api/echo with the parameters source=postman and user=student."}
+          - {path: body.path, equals: /api/echo, hint: "The fixed address must go to {{BASE_URL}}/api/echo."}
+          - {path: body.args.source, equals: postman, hint: "In the fixed address, source must be just postman. Parameters are separated by &, not by a second ?."}
+          - {path: body.args.user, equals: student, hint: "The fixed address has no user=student. The second parameter is added with &."}
+
+  - id: ch01-task5
+    order: 5
+    title: "A mini ticket: the filter doesn't work"
+    description_md: |
+      A user writes:
+
+      > “I want to get only open tickets, so I send
+      > `GET {{BASE_URL}}/api/echo?stauts=open`, but the filter doesn't work.”
+
+      **What to do:**
+
+      1. Send the request **exactly as the user did** and look at the `args` block
+         in the response.
+      2. Find the mistake, fix the address and send it again.
+
+      **What you should see:**
+      - in the first response `args` has a parameter, but with the wrong key;
+      - in the second one — `"status": "open"`.
+
+      **Write a reply to the user** in 1–2 sentences, then compare it with the example.
+
+      <details markdown="1">
+      <summary>Example reply</summary>
+
+      > “There's a typo in the parameter name in the address: `stauts` instead of `status`.
+      > The server doesn't know a `stauts` parameter, so it doesn't apply the filter.
+      > Please send the request like this: `?status=open`.”
+
+      The server didn't reply with an error: the status is `200` and the parameter arrived.
+      But a key with a typo is a completely different parameter for the server. So when
+      someone complains that “the filter doesn't work”, check the keys in the URL first.
+
+      </details>
+    # Two responses in order: first as the user sent it, then the fixed one.
+    expected:
+      ordered: true
+      steps:
+        - - {path: status, equals: 200, hint: "First send the request exactly as the user did: {{BASE_URL}}/api/echo?stauts=open"}
+          - {path: body.path, equals: /api/echo, hint: "First send the request exactly as the user did: {{BASE_URL}}/api/echo?stauts=open"}
+          - {path: body.args.stauts, equals: open, hint: "First reproduce the request exactly as the user sent it — with the typo: ?stauts=open"}
+        - - {path: status, equals: 200, hint: "The request must go to {{BASE_URL}}/api/echo."}
+          - {path: body.path, equals: /api/echo, hint: "The request must go to {{BASE_URL}}/api/echo."}
+          - {path: body.args.status, equals: open, hint: "Now fix the key: check the letters in the parameter name — it should be status=open."}
+          - {path: body.args.stauts, exists: false, hint: "Remove the parameter with the typo, stauts — keep only status=open."}

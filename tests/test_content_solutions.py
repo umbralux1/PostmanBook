@@ -45,6 +45,13 @@ pytestmark = pytest.mark.skipif(NODE is None, reason="нужен Node.js для 
 
 JSON_CT = {"Content-Type": "application/json"}
 TICKET = '{"ticket_id": "123", "message": "Не работает кнопка сохранения", "priority": "high"}'
+TYPES = (
+    '{"ticket_id": "123", "status": "open", "priority": 2, "urgent": true,'
+    ' "tags": ["billing", "mobile"]}'
+)
+ACCEPT_AUTH = {"Accept": "application/json", "Authorization": "Bearer test-token-123"}
+BROKEN_TWO = "{'title': 'Не могу войти', 'priority': 'high',}"
+FIXED_TWO = '{"title": "Не могу войти", "priority": "high"}'
 
 Req = dict[str, Any]
 
@@ -88,6 +95,13 @@ async def send_all(client: AsyncClient, requests: list[Req]) -> list[dict[str, A
 SOLUTIONS: dict[str, list[Req]] = {
     "ch01-task1": [{"url": "/api/echo?source=postman&user=student"}],
     "ch01-task2": [{"url": "/api/echo?source=postman&user=student&ticket_id=123&status=open"}],
+    "ch01-task3": [{"url": "/api/echo?status=open&limit=10"}],
+    "ch01-task4": [
+        {"url": "/api/echo?source=postman?user=student"},
+        {"url": "/api/echosource=postman"},
+        {"url": "/api/echo?source=postman&user=student"},
+    ],
+    "ch01-task5": [{"url": "/api/echo?stauts=open"}, {"url": "/api/echo?status=open"}],
     "ch02-task1": [{"method": "POST", "url": "/api/echo", "headers": JSON_CT, "body": TICKET}],
     "ch02-task2": [
         {
@@ -103,6 +117,25 @@ SOLUTIONS: dict[str, list[Req]] = {
         {"url": "/api/status/500"},
     ],
     "ch02-task4": [{"method": "POST", "url": "/api/echo", "headers": JSON_CT, "body": TICKET}],
+    "ch02-task6": [{"method": "POST", "url": "/api/echo", "headers": JSON_CT, "body": TYPES}],
+    "ch02-task7": [
+        {
+            "method": "POST",
+            "url": "/api/echo",
+            "headers": {**JSON_CT, **ACCEPT_AUTH},
+            "body": TICKET,
+        }
+    ],
+    "ch02-task8": [
+        {"url": "/api/status/503"},
+        {"url": "/api/status/201"},
+        {"url": "/api/status/403"},
+        {"url": "/api/status/401"},
+    ],
+    "ch02-task9": [
+        {"method": "POST", "url": "/api/echo", "headers": JSON_CT, "body": BROKEN_TWO},
+        {"method": "POST", "url": "/api/echo", "headers": JSON_CT, "body": FIXED_TWO},
+    ],
     "ch02-task5": [
         {
             "method": "POST",
@@ -176,6 +209,103 @@ MISTAKES: list[tuple[str, list[Req], str]] = [
         ],
         "исправь",
     ),
+    ("ch01-task3", [{"url": "/api/echo?status=open"}], "limit=10"),
+    ("ch01-task3", [{"url": "/api/tickets?status=open&limit=10"}], "/api/echo"),
+    (
+        "ch01-task4",
+        [{"url": "/api/echo?source=postman&user=student"}],
+        "postman?user=student",
+    ),
+    (
+        "ch01-task4",
+        [{"url": "/api/echo?source=postman?user=student"}, {"url": "/api/echosource=postman"}],
+        "исправленный",
+    ),
+    ("ch01-task5", [{"url": "/api/echo?status=open"}], "stauts"),
+    (
+        "ch01-task5",
+        [{"url": "/api/echo?stauts=open"}, {"url": "/api/echo?stauts=open&status=open"}],
+        "stauts",
+    ),
+    (
+        "ch02-task6",
+        [
+            {
+                "method": "POST",
+                "url": "/api/echo",
+                "headers": JSON_CT,
+                "body": TYPES.replace('"priority": 2', '"priority": "2"'),
+            }
+        ],
+        "число",
+    ),
+    (
+        "ch02-task6",
+        [
+            {
+                "method": "POST",
+                "url": "/api/echo",
+                "headers": JSON_CT,
+                "body": TYPES.replace("true", '"true"'),
+            }
+        ],
+        "true",
+    ),
+    (
+        "ch02-task6",
+        [
+            {
+                "method": "POST",
+                "url": "/api/echo",
+                "headers": JSON_CT,
+                "body": TYPES.replace('"123"', "123"),
+            }
+        ],
+        "строка",
+    ),
+    (
+        "ch02-task7",
+        [
+            {
+                "method": "POST",
+                "url": "/api/echo",
+                "headers": {**JSON_CT, "Authorization": "Bearer test-token-123"},
+                "body": TICKET,
+            }
+        ],
+        "Accept",
+    ),
+    (
+        "ch02-task7",
+        [
+            {
+                "method": "POST",
+                "url": "/api/echo",
+                "headers": {**JSON_CT, "Accept": "application/json"},
+                "body": TICKET,
+            }
+        ],
+        "Authorization",
+    ),
+    ("ch02-task8", [{"url": "/api/status/201"}, {"url": "/api/status/401"}], "403"),
+    (
+        "ch02-task9",
+        [
+            {"method": "POST", "url": "/api/echo", "headers": JSON_CT, "body": BROKEN_TWO},
+            {
+                "method": "POST",
+                "url": "/api/echo",
+                "headers": JSON_CT,
+                "body": BROKEN_TWO.replace(",}", "}"),
+            },
+        ],
+        "обе ошибки",
+    ),
+    (
+        "ch02-task9",
+        [{"method": "POST", "url": "/api/echo", "headers": JSON_CT, "body": FIXED_TWO}],
+        "воспроизведи",
+    ),
 ]
 
 
@@ -201,9 +331,10 @@ async def test_mistake_fails_with_hint(
     assert hint_part in result["hint"], result["hint"]
 
 
-async def test_console_task_needs_console(client: AsyncClient) -> None:
-    history = await send_all(client, SOLUTIONS["ch02-task4"])
-    result = evaluate("ch02-task4", history, {"consoleOpenedAt": None})
+@pytest.mark.parametrize("task_id", ["ch02-task4", "ch02-task7"])
+async def test_console_task_needs_console(client: AsyncClient, task_id: str) -> None:
+    history = await send_all(client, SOLUTIONS[task_id])
+    result = evaluate(task_id, history, {"consoleOpenedAt": None})
     assert result["passed"] is False
     assert result["waitingConsole"] is True
     assert "Console" in result["hint"]

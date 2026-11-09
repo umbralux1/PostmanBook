@@ -134,7 +134,7 @@ async def test_quiz_result_in_english(client: AsyncClient) -> None:
 async def test_progress_badge_in_english(client: AsyncClient) -> None:
     client.cookies.set("lang", "en")
     r = await client.get("/partials/progress/ch01")
-    assert "0 / 2 tasks" in r.text
+    assert "0 / 5 tasks" in r.text
 
 
 async def test_task_texts_show_full_site_url(postman: AsyncClient) -> None:

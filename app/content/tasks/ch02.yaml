@@ -57,7 +57,7 @@ tasks:
         - {path: body.json.priority, in: [low, medium, high], hint: "priority должен быть одним из: \"low\", \"medium\", \"high\"."}
 
   - id: ch02-task2
-    order: 2
+    order: 3
     title: "Заголовки"
     description_md: |
       В том же `POST`-запросе открой вкладку **Headers** и добавь:
@@ -94,7 +94,7 @@ tasks:
         - {path: body.json, exists: true, hint: "Оставь тело из задания 1."}
 
   - id: ch02-task3
-    order: 3
+    order: 5
     title: "Статус-коды вживую"
     description_md: |
       Отправь три `GET`-запроса и запиши в блокнот результат каждого:
@@ -133,7 +133,7 @@ tasks:
           - {path: body.status, equals: 500, hint: "Адрес должен быть именно {{BASE_URL}}/api/status/500."}
 
   - id: ch02-task4
-    order: 4
+    order: 7
     title: "Console"
     description_md: |
       Отправь `POST`-запрос из задания 1 ещё раз, затем открой **Console**
@@ -178,7 +178,7 @@ tasks:
       console_hint: "Ответ правильный. Теперь нажми Console в нижней строке мини-Postman и найди там этот запрос."
 
   - id: ch02-task5
-    order: 5
+    order: 8
     title: "Мини-тикет"
     description_md: |
       Пользователь пишет:
@@ -222,5 +222,197 @@ tasks:
         - - {path: status, equals: 400, hint: "Сначала воспроизведи ошибку: тело ровно как у пользователя (high без кавычек) и заголовок Content-Type: application/json. Сервер должен ответить 400."}
           - {path: body.error, equals: invalid_json, hint: "Сервер должен ответить ошибкой invalid_json — отправь тело ровно как у пользователя."}
         - - {path: status, equals: 200, hint: "Теперь исправь JSON: priority должен быть строкой в кавычках — \"high\"."}
+          - {path: body.json.title, exists: true, hint: "Не потеряй поле title."}
+          - {path: body.json.priority, equals: high, hint: "priority должен быть строкой \"high\"."}
+
+  - id: ch02-task6
+    order: 2
+    title: "Типы значений в JSON"
+    description_md: |
+      Отправь `POST`-запрос на `{{BASE_URL}}/api/echo` с заголовком
+      `Content-Type: application/json` и телом из раздела 2.3:
+
+      ```json
+      {
+        "ticket_id": "123",
+        "status": "open",
+        "priority": 2,
+        "urgent": true,
+        "tags": ["billing", "mobile"]
+      }
+      ```
+
+      Следи за кавычками: в этом теле есть строки, число, значение «да/нет»
+      и список.
+
+      **Как сделать:** метод и заголовок — как в задании 1. Во вкладке **Body**
+      (**raw JSON**) замени тело на JSON выше и нажми **Send**.
+
+      **Что должно быть:** в блоке `json` ответа те же значения тех же типов:
+      `"123"` в кавычках, `2` и `true` без кавычек, `tags` — список.
+
+      **Ответь себе:** для каждого поля назови его тип. Чем `"ticket_id": "123"`
+      отличается от `"ticket_id": 123`?
+
+      <details markdown="1">
+      <summary>Проверь себя</summary>
+
+      - `ticket_id` — строка (цифры в кавычках);
+      - `status` — строка;
+      - `priority` — число (без кавычек);
+      - `urgent` — да/нет (`true` без кавычек);
+      - `tags` — список из двух строк.
+
+      `"123"` — строка, текст из цифр, а `123` — число. Для сервера это разные
+      значения: если он ждёт строку, а пришло число, он может ответить ошибкой.
+      Так же `"true"` в кавычках — это уже не «да», а строка из четырёх букв.
+
+      </details>
+    expected:
+      response:
+        - {path: status, equals: 200, hint: "Сервер не ответил 200. Проверь адрес ({{BASE_URL}}/api/echo) и что в JSON нет ошибок — кавычки и запятые."}
+        - {path: body.method, equals: POST, hint: "Нужен метод POST, как в задании 1."}
+        - {path: body.headers.content-type, contains: application/json, hint: "Добавь заголовок Content-Type: application/json."}
+        - {path: body.json, exists: true, hint: "Сервер не получил JSON. Во вкладке Body выбери raw JSON и вставь тело из задания."}
+        - {path: body.json.ticket_id, equals: "123", hint: "ticket_id — строка: \"123\" в двойных кавычках."}
+        - {path: body.json.status, equals: open, hint: "status — строка \"open\" в двойных кавычках."}
+        - {path: body.json.priority, equals: 2, hint: "priority — число: 2 без кавычек. \"2\" в кавычках — уже строка."}
+        - {path: body.json.urgent, equals: true, hint: "urgent — значение «да»: true без кавычек и маленькими буквами."}
+        - {path: body.json.tags, equals: [billing, mobile], hint: "tags — список в квадратных скобках: [\"billing\", \"mobile\"]."}
+
+  - id: ch02-task7
+    order: 4
+    title: "Accept и Authorization"
+    description_md: |
+      В том же `POST`-запросе добавь во вкладке **Headers** ещё два заголовка
+      из раздела 2.4:
+
+      - `Accept: application/json` — «ответ хочу в JSON»;
+      - `Authorization: Bearer test-token-123` — «пропуск». Это учебный токен,
+        не настоящий.
+
+      **Как сделать:** прежние заголовки и тело не удаляй, новые впиши в
+      следующие пустые строки. Нажми **Send**, потом открой **Console**.
+
+      **Что должно быть:**
+      - в блоке `headers` ответа есть `accept: application/json`;
+      - там же есть `authorization`, но вместо токена — `***`;
+      - в Console у отправленного запроса токен виден целиком.
+
+      **Ответь себе:** почему echo спрятал токен в ответе? Что это значит для
+      скриншотов Console, которые ты отправляешь коллегам?
+
+      <details markdown="1">
+      <summary>Проверь себя</summary>
+
+      Токен — ключ от аккаунта (раздел 2.5). Учебный сервер получил его, но не
+      показывает в ответе, а заменяет на `***` — так же стоит поступать и тебе.
+
+      Console показывает запрос таким, каким он ушёл, — вместе с настоящим
+      токеном. Поэтому перед тем как отправить скриншот Console или текст
+      запроса в тикет или чат, замени токен на `***`.
+
+      </details>
+    expected:
+      response:
+        - {path: status, equals: 200, hint: "Сервер не ответил 200. Проверь адрес ({{BASE_URL}}/api/echo) и JSON в теле."}
+        - {path: body.method, equals: POST, hint: "Нужен POST-запрос из прошлых заданий."}
+        - {path: body.headers.content-type, contains: application/json, hint: "Не удаляй заголовок Content-Type: application/json."}
+        - {path: body.headers.accept, equals: application/json, hint: "В headers ответа нет accept: application/json. Добавь заголовок Accept со значением application/json."}
+        - {path: body.headers.authorization, exists: true, hint: "В headers ответа нет authorization. Добавь заголовок Authorization со значением Bearer test-token-123."}
+      require_console: true
+      console_hint: "Заголовки дошли. Теперь нажми Console в нижней строке мини-Postman и найди в запросе Authorization."
+
+  - id: ch02-task8
+    order: 6
+    title: "Коды, которые надо знать наизусть"
+    description_md: |
+      В задании 5 были `200`, `404` и `500`. Посмотри на остальные коды из
+      раздела 2.2. Отправь четыре `GET`-запроса:
+
+      1. `GET {{BASE_URL}}/api/status/201`
+      2. `GET {{BASE_URL}}/api/status/401`
+      3. `GET {{BASE_URL}}/api/status/403`
+      4. `GET {{BASE_URL}}/api/status/503`
+
+      **Как сделать:** как в задании 5 — метод `GET`, **Body** `none`, меняй
+      число в адресе и жми **Send**. Задание засчитается, когда будут
+      отправлены все четыре.
+
+      Для каждого кода определи:
+      - группу (`2xx`, `4xx`, `5xx`);
+      - что делает поддержка: всё хорошо, проверяем у себя или эскалируем.
+
+      **Ответь себе:** пользователь получил `403`. Поможет ли ему войти
+      в аккаунт заново?
+
+      <details markdown="1">
+      <summary>Проверь себя</summary>
+
+      - `201` — `2xx`, объект создан, всё хорошо.
+      - `401` — `4xx`, сервер не знает, кто ты: токена нет, он неверный или
+        просрочен. Проверяем токен.
+      - `403` — `4xx`, сервер знает, кто ты, но этому пользователю действие
+        запрещено. Проверяем права пользователя.
+      - `503` — `5xx`, сервис недоступен. Собираем детали и эскалируем.
+
+      Новый вход даст новый токен — это помогает при `401`. При `403` токен
+      в порядке, дело в правах, поэтому повторный вход не поможет.
+
+      </details>
+    # Четыре ответа в любом порядке.
+    expected:
+      steps:
+        - - {path: status, equals: 201, hint: "Отправь GET на {{BASE_URL}}/api/status/201."}
+          - {path: body.status, equals: 201, hint: "Отправь GET на {{BASE_URL}}/api/status/201."}
+        - - {path: status, equals: 401, hint: "Теперь отправь GET на {{BASE_URL}}/api/status/401."}
+          - {path: body.status, equals: 401, hint: "Адрес должен быть именно {{BASE_URL}}/api/status/401."}
+        - - {path: status, equals: 403, hint: "Теперь отправь GET на {{BASE_URL}}/api/status/403."}
+          - {path: body.status, equals: 403, hint: "Адрес должен быть именно {{BASE_URL}}/api/status/403."}
+        - - {path: status, equals: 503, hint: "Теперь отправь GET на {{BASE_URL}}/api/status/503."}
+          - {path: body.status, equals: 503, hint: "Адрес должен быть именно {{BASE_URL}}/api/status/503."}
+
+  - id: ch02-task9
+    order: 9
+    title: "Мини-тикет: две ошибки в JSON"
+    description_md: |
+      Пользователь пишет:
+
+      > «Создаю заявку, а сервер отвечает `400 Bad Request`. Вот тело:
+      > `{'title': 'Не могу войти', 'priority': 'high',}`. Что не так?»
+
+      **Что сделать:**
+
+      1. Отправь `POST` на `{{BASE_URL}}/api/echo` с заголовком
+         `Content-Type: application/json` и телом **ровно как у пользователя**.
+         Мини-Postman подсветит ошибку JSON — всё равно нажми **Send**.
+      2. Найди в теле **все** ошибки (их две), исправь и отправь снова.
+
+      **Что должно быть:**
+      - первый запрос падает с `400`;
+      - второй проходит с `200`, в блоке `json` есть `title` и `priority`.
+
+      **Сформулируй ответ пользователю** в 2–3 предложениях, потом сравни
+      с примером.
+
+      <details markdown="1">
+      <summary>Пример ответа</summary>
+
+      > «В теле запроса две ошибки, из-за них JSON невалиден и сервер отвечает
+      > `400 Bad Request`: ключи и строки записаны в одинарных кавычках, а после
+      > последней пары стоит лишняя запятая. Правильно так:
+      > `{"title": "Не могу войти", "priority": "high"}`.»
+
+      Если исправить только одну ошибку, JSON всё равно останется невалидным —
+      поэтому важно найти все.
+
+      </details>
+    # Два ответа по порядку: сначала ошибка 400, потом успех.
+    expected:
+      ordered: true
+      steps:
+        - - {path: status, equals: 400, hint: "Сначала воспроизведи ошибку: тело ровно как у пользователя (одинарные кавычки и запятая в конце) и заголовок Content-Type: application/json. Сервер должен ответить 400."}
+          - {path: body.error, equals: invalid_json, hint: "Сервер должен ответить ошибкой invalid_json — отправь тело ровно как у пользователя."}
+        - - {path: status, equals: 200, hint: "JSON всё ещё сломан. Исправь обе ошибки: кавычки должны быть двойными, а после последней пары запятой нет."}
           - {path: body.json.title, exists: true, hint: "Не потеряй поле title."}
           - {path: body.json.priority, equals: high, hint: "priority должен быть строкой \"high\"."}

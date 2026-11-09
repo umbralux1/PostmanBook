@@ -28,7 +28,7 @@ async def test_echo_post_json(client: AsyncClient) -> None:
 async def test_echo_hides_cookie_and_authorization(client: AsyncClient) -> None:
     r = await client.get("/api/echo", headers={"Authorization": "Bearer secret"})
     headers = r.json()["headers"]
-    assert headers["authorization"] == "***скрыто***"
+    assert headers["authorization"] == "***"
     assert "secret" not in r.text
     assert "test-session-token" not in r.text
 
