@@ -51,6 +51,8 @@ SHARED_FIELDS: frozenset[str] = frozenset(
         "consoleOpenedAt",
         "error",
         "taskId",
+        "requestTabs",
+        "activeTab",
     }
 )
 RELAY_TYPES: frozenset[str] = frozenset({"cursor", "cursor_leave", "click", "selection"})

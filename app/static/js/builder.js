@@ -5,7 +5,12 @@ document.addEventListener("alpine:init", function () {
   var SHARED_FIELDS = [
     "method", "url", "params", "headers", "bodyMode", "body",
     "tab", "respTab", "respView", "openedLog", "sending", "response", "log", "history", "consoleOpenedAt",
+    "requestTabs", "activeTab",
   ];
+  // Поля, которые у каждой вкладки запроса свои (как в Postman). Console (log),
+  // история ответов для проверки и выбранное задание — общие для всех вкладок.
+  var TAB_FIELDS = ["method", "url", "params", "headers", "bodyMode", "body", "tab", "respTab", "respView", "response"];
+  var MAX_TABS = 10;
   // Цвета методов — как в Postman.
   var METHOD_COLORS = {
     GET: "#007f31", POST: "#ad7a03", PUT: "#0053b8", PATCH: "#623497", DELETE: "#8e1a10",
@@ -26,7 +31,25 @@ document.addEventListener("alpine:init", function () {
     log: function () { return []; },
     history: function () { return {}; },
     consoleOpenedAt: function () { return {}; },
+    requestTabs: function () { return [newTab(window.location.origin + "/api/echo")]; },
+    activeTab: function () { return null; },
   };
+
+  function tabId() {
+    return "t" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  }
+  // Вкладка хранит снимок полей запроса; у активной вкладки живые значения — в компоненте.
+  function newTab(url) {
+    return {
+      id: tabId(),
+      data: {
+        method: "GET", url: url || "", params: [{ key: "", value: "" }],
+        headers: [{ key: "", value: "" }], bodyMode: "none", body: "",
+        tab: "params", respTab: "body", respView: "pretty", response: null,
+      },
+    };
+  }
+  function clone(v) { return JSON.parse(JSON.stringify(v === undefined ? null : v)); }
   var HEADER_NAMES = ["Content-Type", "Accept", "Authorization", "X-Debug-Source", "Cache-Control"];
   var MAX_LOG = 10;
 
@@ -80,9 +103,14 @@ document.addEventListener("alpine:init", function () {
       bad: {},
       history: {},          // id задания → ответы сервера (старые → новые)
       consoleOpenedAt: {},  // id задания → сколько ответов было, когда открыли Console
+      requestTabs: [],      // вкладки запросов: [{id, data}]
+      activeTab: null,      // id активной вкладки
 
       init: function () {
         this.syncParamsFromUrl();
+        var first = newTab(this.url);
+        this.requestTabs = [first];
+        this.activeTab = first.id;
         var self = this;
         window.addEventListener("task-selected", function () {
           self.validation = null;
@@ -118,6 +146,7 @@ document.addEventListener("alpine:init", function () {
         var start = hasCaret ? active.selectionStart : null;
         var end = hasCaret ? active.selectionEnd : null;
         this[field] = value === null || value === undefined ? DEFAULTS[field]() : JSON.parse(JSON.stringify(value));
+        if (field === "requestTabs" || field === "activeTab") this.fixActiveTab();
         var self = this;
         this.$nextTick(function () {
           if (hasCaret && document.activeElement === active && start !== null) {
@@ -128,6 +157,62 @@ document.addEventListener("alpine:init", function () {
           if (field === "history" || field === "consoleOpenedAt") self.evaluate(true);
           if (field === "response" || field === "history") self.bad = self.bad || {};
         });
+      },
+
+      // ---------- Вкладки запросов ----------
+      saveActiveTab: function () {
+        var self = this;
+        var t = this.requestTabs.find(function (x) { return x.id === self.activeTab; });
+        if (!t) return;
+        var data = {};
+        TAB_FIELDS.forEach(function (f) { data[f] = clone(self[f]); });
+        t.data = data;
+      },
+      loadTab: function (t) {
+        var self = this;
+        TAB_FIELDS.forEach(function (f) {
+          self[f] = t.data[f] === undefined || t.data[f] === null ? DEFAULTS[f]() : clone(t.data[f]);
+        });
+        this.activeTab = t.id;
+        this.error = null;
+      },
+      // Активная вкладка должна существовать (например, в комнате ещё нет вкладок).
+      fixActiveTab: function () {
+        if (!Array.isArray(this.requestTabs) || !this.requestTabs.length) this.requestTabs = DEFAULTS.requestTabs();
+        var self = this;
+        if (!this.requestTabs.some(function (x) { return x.id === self.activeTab; })) this.activeTab = this.requestTabs[0].id;
+      },
+      selectTab: function (id) {
+        if (this.sending || id === this.activeTab) return;
+        var t = this.requestTabs.find(function (x) { return x.id === id; });
+        if (!t) return;
+        this.saveActiveTab();
+        this.loadTab(t);
+      },
+      addTab: function () {
+        if (this.sending || this.requestTabs.length >= MAX_TABS) return;
+        this.saveActiveTab();
+        var t = newTab("");
+        this.requestTabs.push(t);
+        this.loadTab(t);
+      },
+      closeTab: function (id) {
+        if (this.sending) return;
+        var i = this.requestTabs.findIndex(function (x) { return x.id === id; });
+        if (i < 0) return;
+        var wasActive = id === this.activeTab;
+        if (!wasActive) this.saveActiveTab();
+        this.requestTabs.splice(i, 1);
+        if (!this.requestTabs.length) this.requestTabs.push(newTab(""));
+        if (wasActive) this.loadTab(this.requestTabs[Math.min(i, this.requestTabs.length - 1)]);
+      },
+      // Подпись вкладки: как в Postman, у несохранённого запроса — его URL.
+      tabLabel: function (t) {
+        var url = t.id === this.activeTab ? this.url : t.data.url;
+        return (url || "").trim() || "Untitled Request";
+      },
+      tabMethod: function (t) {
+        return t.id === this.activeTab ? this.method : t.data.method;
       },
 
       // ---------- Params <-> URL ----------

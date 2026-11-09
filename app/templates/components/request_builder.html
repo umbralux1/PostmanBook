@@ -3,12 +3,17 @@
    в обоих языках, как в настоящем приложении; пояснения для ученика — переводятся. #}
 <div x-data="builder" class="pm">
   {# --- Вкладка запроса --- #}
-  <div class="pm-tabstrip">
-    <div class="pm-reqtab">
-      <span class="pm-reqtab-method" :style="{ color: methodColor(method) }" x-text="method"></span>
-      <span class="pm-reqtab-title" x-text="$store.task.id ? $store.task.title : 'Untitled Request'"></span>
-    </div>
-    <span class="pm-tabstrip-plus" aria-hidden="true">+</span>
+  <div class="pm-tabstrip" role="tablist">
+    <template x-for="rt in requestTabs" :key="rt.id">
+      <div class="pm-reqtab" role="tab" :aria-selected="rt.id === activeTab"
+           :class="rt.id === activeTab ? 'is-active' : ''" @click="selectTab(rt.id)" @mousedown.middle.prevent="closeTab(rt.id)">
+        <span class="pm-reqtab-method" :style="{ color: methodColor(tabMethod(rt)) }" x-text="tabMethod(rt)"></span>
+        <span class="pm-reqtab-title" x-text="tabLabel(rt)" :title="tabLabel(rt)"></span>
+        <button type="button" class="pm-reqtab-close" @click.stop="closeTab(rt.id)" :disabled="sending" title="Close Tab" aria-label="Close Tab">✕</button>
+      </div>
+    </template>
+    <button type="button" class="pm-tabstrip-plus" @click="addTab()" :disabled="sending || requestTabs.length >= 10"
+            title="New Tab" aria-label="New Tab">+</button>
   </div>
 
   <div class="pm-crumbs">

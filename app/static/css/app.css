@@ -74,13 +74,23 @@
 
 /* Полоса вкладок запросов */
 .pm-tabstrip { display: flex; align-items: stretch; background: var(--pm-bg-2);
-  border-bottom: 1px solid var(--pm-border); height: 36px; }
-.pm-reqtab { display: flex; align-items: center; gap: 8px; max-width: 75%; padding: 0 14px;
-  background: #fff; border-right: 1px solid var(--pm-border); border-top: 2px solid var(--pm-orange);
-  margin-bottom: -1px; }
+  border-bottom: 1px solid var(--pm-border); height: 36px; overflow-x: auto; overflow-y: hidden;
+  scrollbar-width: none; }
+.pm-tabstrip::-webkit-scrollbar { display: none; }
+.pm-reqtab { display: flex; align-items: center; gap: 8px; flex: 0 1 200px; min-width: 110px; padding: 0 6px 0 12px;
+  border-right: 1px solid var(--pm-border); border-top: 2px solid transparent; cursor: pointer;
+  color: var(--pm-text-2); }
+.pm-reqtab:hover { background: #fff; }
+.pm-reqtab.is-active { background: #fff; border-top-color: var(--pm-orange); margin-bottom: -1px; color: var(--pm-text); }
 .pm-reqtab-method { font-size: 10px; font-weight: 700; letter-spacing: .02em; }
-.pm-reqtab-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--pm-text); }
-.pm-tabstrip-plus { display: flex; align-items: center; padding: 0 12px; color: var(--pm-text-3); font-size: 16px; }
+.pm-reqtab-title { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pm-reqtab-close { flex: none; width: 20px; height: 20px; border-radius: 3px; font-size: 10px;
+  color: var(--pm-text-3); visibility: hidden; }
+.pm-reqtab.is-active .pm-reqtab-close, .pm-reqtab:hover .pm-reqtab-close { visibility: visible; }
+.pm-reqtab-close:hover { background: var(--pm-bg-2); color: var(--pm-text); }
+.pm-tabstrip-plus { flex: none; display: flex; align-items: center; padding: 0 12px; color: var(--pm-text-3); font-size: 16px; }
+.pm-tabstrip-plus:hover:not(:disabled) { color: var(--pm-text); background: #fff; }
+.pm-tabstrip-plus:disabled, .pm-reqtab-close:disabled { opacity: .4; cursor: default; }
 
 /* Хлебные крошки над строкой запроса */
 .pm-crumbs { display: flex; align-items: center; gap: 6px; padding: 10px 14px 0;
