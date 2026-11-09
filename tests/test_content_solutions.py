@@ -1,6 +1,6 @@
 """Сквозная проверка контента: настоящий сервер + настоящий checker.js.
 
-Для каждого задания главы 1 отправляем эталонное решение (и типичные ошибки)
+Для каждого задания фазы 1 (во всех главах) отправляем эталонное решение (и типичные ошибки)
 на учебный API, берём ответы сервера и прогоняем их через тот же checker.js,
 что работает в браузере. Так ловим задания, которые нельзя решить или
 которые засчитываются за неправильный запрос.
@@ -14,21 +14,31 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-import yaml
 from httpx import AsyncClient, Response
+
+from app.i18n import SOURCE_LANG
+from app.services.task_loader import TasksFile, load_task_files, load_task_translations
 
 ROOT = Path(__file__).resolve().parents[1]
 RUNNER = ROOT / "tests/js/evaluate.cjs"
 NODE = shutil.which("node")
-TASK_FILES = {"ru": "ch01.yaml", "en": "ch01.en.yaml"}
+CONTENT_DIR = ROOT / "app/content"
+
+
+def _phase1(files: list[TasksFile]) -> dict[str, dict[str, Any]]:
+    return {t.id: t.model_dump() for f in files for t in f.tasks if t.phase == 1}
+
+
+# Все главы, а не только ch01: задание без эталонного решения роняет
+# test_every_phase1_task_has_solution.
 TASKS_BY_LANG = {
-    lang: {
-        t["id"]: t
-        for t in yaml.safe_load((ROOT / "app/content/tasks" / name).read_text("utf-8"))["tasks"]
-    }
-    for lang, name in TASK_FILES.items()
+    SOURCE_LANG: _phase1(load_task_files(CONTENT_DIR)),
+    **{
+        lang: _phase1(list(by_chapter.values()))
+        for lang, by_chapter in load_task_translations(CONTENT_DIR).items()
+    },
 }
-TASKS = TASKS_BY_LANG["ru"]
+TASKS = TASKS_BY_LANG[SOURCE_LANG]
 CYRILLIC = re.compile(r"[А-Яа-яЁё]")
 
 pytestmark = pytest.mark.skipif(NODE is None, reason="нужен Node.js для запуска checker.js")
@@ -43,7 +53,7 @@ def evaluate(
     task_id: str,
     history: list[dict[str, Any]],
     state: dict[str, Any] | None = None,
-    lang: str = "ru",
+    lang: str = SOURCE_LANG,
 ) -> Any:
     expected = TASKS_BY_LANG[lang][task_id]["expected"]
     payload = json.dumps({"expected": expected, "history": history, "state": state or {}})

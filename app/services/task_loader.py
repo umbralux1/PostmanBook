@@ -257,6 +257,7 @@ def sync_content(session: Session, content_dir: Path) -> tuple[int, int]:
     session.flush()
 
     task_tr = load_task_translations(content_dir)
+    task_ids: set[str] = set()
     n_tasks = 0
     for tf in load_task_files(content_dir):
         if tf.chapter_id not in chapter_ids:
@@ -294,9 +295,28 @@ def sync_content(session: Session, content_dir: Path) -> tuple[int, int]:
                 task.description_md, task.expected = t.description_md, t.expected
                 task.hints, task.phase, task.translations = t.hints, t.phase, translations
             session.add(task)
+            task_ids.add(t.id)
             n_tasks += 1
+
+    # Удалённое из YAML убираем из БД, иначе оно остаётся на сайте.
+    # Попытки (Attempt) не трогаем: история прогресса вернётся, если задание вернут.
+    removed_tasks = [t for t in session.exec(select(Task)).all() if t.id not in task_ids]
+    for task in removed_tasks:
+        session.delete(task)
+    session.flush()
+    removed_chapters = [c for c in session.exec(select(Chapter)).all() if c.id not in chapter_ids]
+    for chapter in removed_chapters:
+        session.delete(chapter)
     session.commit()
-    log.info("content synced", extra={"chapters": len(chapters), "tasks": n_tasks})
+    log.info(
+        "content synced",
+        extra={
+            "chapters": len(chapters),
+            "tasks": n_tasks,
+            "removed_chapters": [c.id for c in removed_chapters],
+            "removed_tasks": [t.id for t in removed_tasks],
+        },
+    )
     return len(chapters), n_tasks
 
 
