@@ -102,8 +102,9 @@
   </div>
 
   {# ---------- Правая колонка: мини-Postman ---------- #}
+  {# На десктопе колонка не выше окна и прокручивается сама, не двигая теорию. #}
   <aside class="min-w-0">
-    <div id="builder" class="lg:sticky lg:top-4">
+    <div id="builder" class="lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto lg:overscroll-contain">
       {% include "components/request_builder.html" %}
     </div>
   </aside>

@@ -54,6 +54,26 @@
     return null;
   }
 
+  // Видимая область элемента: пересечение прямоугольников его прокручиваемых предков
+  // (колонка мини-Postman, журнал Console). Что прокручено за край — не рисуем.
+  function clipRect(el) {
+    var c = { left: 0, top: 0, right: window.innerWidth, bottom: window.innerHeight };
+    for (var a = el && el.parentElement; a && a !== document.body; a = a.parentElement) {
+      var cs = getComputedStyle(a);
+      if (cs.overflowX === "visible" && cs.overflowY === "visible") continue;
+      var r = a.getBoundingClientRect();
+      c.left = Math.max(c.left, r.left);
+      c.top = Math.max(c.top, r.top);
+      c.right = Math.min(c.right, r.right);
+      c.bottom = Math.min(c.bottom, r.bottom);
+    }
+    return c;
+  }
+
+  function inClip(c, x, y) {
+    return x >= c.left && x <= c.right && y >= c.top && y <= c.bottom;
+  }
+
   function nodeRef(node) {
     if (node.nodeType === 1) return { el: pathOf(node), child: -1 };
     var parent = node.parentElement;
@@ -231,7 +251,8 @@
     var el = elFromPath(msg.path);
     var r = el && visibleRect(el);
     if (!r) return null;
-    return { x: r.left + msg.rx * r.width, y: r.top + msg.ry * r.height };
+    var p = { x: r.left + msg.rx * r.width, y: r.top + msg.ry * r.height };
+    return inClip(clipRect(el), p.x, p.y) ? p : null;
   }
 
   // ---------- Клики ----------
@@ -340,22 +361,34 @@
 
   function selectionRects(entry) {
     if (!entry || entry.page !== location.pathname) return [];
-    var sel = entry.sel;
+    var res = rawSelectionRects(entry.sel);
+    if (!res.rects.length || !res.el) return [];
+    var c = clipRect(res.el);
+    return res.rects.filter(function (r) {
+      return r.top + r.height > c.top && r.top < c.bottom &&
+             r.left + r.width >= c.left && r.left <= c.right;
+    });
+  }
+
+  function rawSelectionRects(sel) {
+    var none = { rects: [], el: null };
     if (sel.kind === "field") {
       var field = elFromPath(sel.path);
-      if (!isTextField(field)) return [];
-      return fieldRects(field, sel.start, sel.end).rects;
+      if (!isTextField(field)) return none;
+      return { rects: fieldRects(field, sel.start, sel.end).rects, el: field };
     }
     var a = nodeFromRef(sel.start);
     var b = nodeFromRef(sel.end);
-    if (!a || !b) return [];
+    if (!a || !b) return none;
     try {
       var range = document.createRange();
       range.setStart(a, Math.min(sel.so, a.length !== undefined ? a.length : a.childNodes.length));
       range.setEnd(b, Math.min(sel.eo, b.length !== undefined ? b.length : b.childNodes.length));
-      return Array.prototype.slice.call(range.getClientRects());
+      var host = range.commonAncestorContainer;
+      if (host.nodeType !== 1) host = host.parentElement;
+      return { rects: Array.prototype.slice.call(range.getClientRects()), el: host };
     } catch (e) {
-      return [];
+      return none;
     }
   }
 
@@ -557,10 +590,11 @@
     document.documentElement.addEventListener("pointerleave", function () {
       send({ type: "cursor_leave" });
     });
-    // Прокрутка меняет, над каким элементом курсор, — пересчитываем.
-    window.addEventListener("scroll", function () {
+    // Прокрутка (страницы или колонки мини-Postman) меняет, над каким элементом
+    // курсор, — пересчитываем. capture: scroll элементов не всплывает.
+    document.addEventListener("scroll", function () {
       if (lastPointer) onPointerMove(lastPointer);
-    }, { passive: true });
+    }, { capture: true, passive: true });
     ["selectionchange", "keyup", "mouseup", "input", "focusin", "focusout", "scroll"].forEach(function (ev) {
       document.addEventListener(ev, scheduleSelection, true);
     });
