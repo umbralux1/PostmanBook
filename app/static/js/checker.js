@@ -12,7 +12,7 @@
 //   response: [...]                 — один ответ должен удовлетворить всем утверждениям;
 //   steps: [[...], [...]]           — несколько ответов, каждый шаг — свой список утверждений;
 //   ordered: true                   — шаги должны выполняться по порядку;
-//   require_console: true           — после выполнения нужно открыть вкладку Console.
+//   require_console: true           — после выполнения нужно открыть Console (кнопка в нижней строке мини-Postman).
 (function (root, factory) {
   var api = factory();
   if (typeof module === "object" && module.exports) module.exports = api;
@@ -207,7 +207,7 @@
         var opened = state.consoleOpenedAt;
         if (opened === null || opened === undefined || opened < completedAt + 1) {
           result.waitingConsole = true;
-          result.hint = expected.console_hint || tr("Теперь открой вкладку Console.");
+          result.hint = expected.console_hint || tr("Теперь открой Console: кнопка в нижней строке мини-Postman.");
           return result;
         }
       }

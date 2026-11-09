@@ -25,7 +25,7 @@ DEFAULT_HINTS: dict[str, str] = {
     "sequence_incomplete": "Осталось отправить: {{remaining}}.",
     "first_attempt_not_failed": "Сначала воспроизведи ошибку пользователя.",
     "second_attempt_not_fixed": "Теперь исправь тело и отправь снова.",
-    "console_not_opened": "Открой вкладку Console и отправь запрос ещё раз.",
+    "console_not_opened": "Открой Console и отправь запрос ещё раз.",
     "post_with_json_required": "Сначала отправь POST с валидным JSON из задания 3.",
     "wrong_status": "Ожидался статус {{expected}}, а в ответе {{actual}}.",
     "missing_response_field": "В ответе не найдено поле {{field}}.",

@@ -45,9 +45,6 @@
     <button type="button" class="pm-tab" @click="tab='body'" :class="[tab==='body' ? 'is-active' : '', ring('body')]">
       Body<span class="pm-dot" x-show="bodyError"></span>
     </button>
-    <button type="button" class="pm-tab" @click="openConsole()" :class="[tab==='console' ? 'is-active' : '', ring('console')]">
-      Console<span class="pm-count" x-show="log.length" x-text="'(' + log.length + ')'"></span>
-    </button>
   </div>
 
   {# --- Params --- #}
@@ -121,13 +118,28 @@
     <p x-show="bodyMode==='none'" class="pm-note">{{ _("Запрос уйдёт без тела.") }}</p>
   </div>
 
-  {# --- Console --- #}
-  <div class="pm-panel" x-show="tab==='console'" x-cloak>
-    {% include "components/console.html" %}
-  </div>
-
   <p x-show="error" x-cloak class="pm-error" x-text="error"></p>
 
   {% include "components/hint.html" %}
   {% include "components/response_panel.html" %}
+
+  {# --- Console: журнал под ответом, открывается кнопкой в нижней строке, как в Postman --- #}
+  <div class="pm-console" x-show="consoleOpen" x-cloak>
+    <div class="pm-console-head">
+      <span>Console</span>
+      <button type="button" class="pm-del" @click="toggleConsole()" title="Close Console" aria-label="Close Console">✕</button>
+    </div>
+    {% include "components/console.html" %}
+  </div>
+
+  {# --- Нижняя строка окна --- #}
+  <div class="pm-statusbar">
+    <button type="button" class="pm-statusbtn" @click="toggleConsole()" :aria-pressed="consoleOpen ? 'true' : 'false'"
+            :class="[consoleOpen ? 'is-active' : '', ring('console')]" title="Console">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true">
+        <rect x="1.5" y="2.5" width="13" height="11" rx="1.5"/><path d="M4.5 6l2 2-2 2M8.5 10.5h3"/>
+      </svg>
+      Console<span class="pm-count" x-show="log.length" x-text="'(' + log.length + ')'"></span>
+    </button>
+  </div>
 </div>

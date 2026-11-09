@@ -117,7 +117,7 @@
 .pm-send:hover { background: var(--pm-blue-hover); }
 .pm-send:disabled { opacity: .7; cursor: progress; }
 
-/* Вкладки Params / Headers / Body / Console */
+/* Вкладки Params / Headers / Body */
 .pm-tabs { display: flex; gap: 2px; padding: 0 10px; border-bottom: 1px solid var(--pm-border); }
 .pm-tab { position: relative; padding: 9px 8px 8px; color: var(--pm-text-2); background: none; border: 0;
   cursor: pointer; white-space: nowrap; }
@@ -213,7 +213,20 @@
 .pm-badge.fail { background: #fdecea; color: var(--pm-red); }
 .pm-test code { font-family: var(--pm-mono); font-size: 12px; color: var(--pm-text); }
 
-/* Console */
+/* Console: панель под ответом и кнопка в нижней строке, как в Postman */
+.pm-console { border-top: 1px solid var(--pm-border); }
+.pm-console-head { display: flex; align-items: center; justify-content: space-between; padding: 6px 8px 6px 14px;
+  font-weight: 500; border-bottom: 1px solid var(--pm-border); }
+.pm-console-body { padding: 8px 14px 10px; }
+.pm-statusbar { display: flex; align-items: center; gap: 4px; padding: 2px 8px; border-top: 1px solid var(--pm-border);
+  background: var(--pm-bg-2); }
+.pm-statusbtn { position: relative; display: inline-flex; align-items: center; gap: 5px; padding: 4px 6px;
+  border: 0; border-radius: 4px; background: none; color: var(--pm-text-2); font-size: 12px; cursor: pointer; }
+.pm-statusbtn:hover { background: var(--pm-hover); color: var(--pm-text); }
+.pm-statusbtn.is-active { background: var(--pm-hover); color: var(--pm-text); }
+.pm .pm-statusbtn.is-bad { box-shadow: none; color: var(--pm-orange); }
+.pm-statusbtn.is-bad::after { content: ""; position: absolute; top: 3px; right: 0; width: 6px; height: 6px;
+  border-radius: 99px; background: var(--pm-orange); }
 .pm-console-row { display: flex; align-items: center; gap: 8px; width: 100%; padding: 5px 8px; background: none;
   border: 0; border-bottom: 1px solid var(--pm-hover); text-align: left; cursor: pointer;
   font-family: var(--pm-mono); font-size: 12px; }

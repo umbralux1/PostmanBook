@@ -1,10 +1,10 @@
 {# Console — журнал запросов, как Postman Console. #}
-<div>
+<div class="pm-console-body">
   <p class="pm-section-title">{{ _("Журнал последних 10 запросов: что ушло на сервер и что пришло в ответ — «как есть».") }}</p>
   <template x-if="!log.length">
     <p class="pm-note">{{ _("Пока пусто. Отправь запрос.") }}</p>
   </template>
-  <div class="max-h-80 overflow-auto rounded border border-[#e6e6e6]" x-show="log.length">
+  <div class="max-h-64 overflow-auto rounded border border-[#e6e6e6]" x-show="log.length">
     <template x-for="(e, i) in log" :key="i + e.at">
       <div>
         <button type="button" class="pm-console-row" @click="openedLog = openedLog === i ? null : i">

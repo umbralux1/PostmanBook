@@ -5,9 +5,9 @@ document.addEventListener("alpine:init", function () {
   var SHARED_FIELDS = [
     "method", "url", "params", "headers", "bodyMode", "body",
     "tab", "respTab", "respView", "openedLog", "sending", "response", "log", "history", "consoleOpenedAt",
-    "requestTabs", "activeTab",
+    "requestTabs", "activeTab", "consoleOpen",
   ];
-  // Поля, которые у каждой вкладки запроса свои (как в Postman). Console (log),
+  // Поля, которые у каждой вкладки запроса свои (как в Postman). Console (log, consoleOpen),
   // история ответов для проверки и выбранное задание — общие для всех вкладок.
   var TAB_FIELDS = ["method", "url", "params", "headers", "bodyMode", "body", "tab", "respTab", "respView", "response"];
   var MAX_TABS = 10;
@@ -33,6 +33,7 @@ document.addEventListener("alpine:init", function () {
     consoleOpenedAt: function () { return {}; },
     requestTabs: function () { return [newTab(window.location.origin + "/api/echo")]; },
     activeTab: function () { return null; },
+    consoleOpen: function () { return false; },
   };
 
   function tabId() {
@@ -105,6 +106,7 @@ document.addEventListener("alpine:init", function () {
       consoleOpenedAt: {},  // id задания → сколько ответов было, когда открыли Console
       requestTabs: [],      // вкладки запросов: [{id, data}]
       activeTab: null,      // id активной вкладки
+      consoleOpen: false,   // открыта ли панель Console (кнопка в нижней строке)
 
       init: function () {
         this.syncParamsFromUrl();
@@ -360,6 +362,8 @@ document.addEventListener("alpine:init", function () {
         var list = this.history[task.id] || (this.history[task.id] = []);
         list.push(response);
         if (list.length > 20) list.shift();
+        // Console уже открыта — ответ сразу виден в журнале, повторно открывать не нужно.
+        if (this.consoleOpen) this.consoleOpenedAt[task.id] = list.length;
         this.evaluate(false);
       },
 
@@ -405,8 +409,13 @@ document.addEventListener("alpine:init", function () {
         } catch (e) { /* прогресс не сохранился — задание всё равно видно как выполненное */ }
       },
 
-      openConsole: function () {
-        this.tab = "console";
+      // Кнопка Console в нижней строке: открывает и закрывает журнал.
+      // Открытие засчитывается заданиям с require_console.
+      toggleConsole: function () {
+        this.consoleOpen = !this.consoleOpen;
+        if (this.consoleOpen) this.markConsoleOpened();
+      },
+      markConsoleOpened: function () {
         var task = Alpine.store("task");
         if (!task.id) return;
         this.consoleOpenedAt[task.id] = (this.history[task.id] || []).length;

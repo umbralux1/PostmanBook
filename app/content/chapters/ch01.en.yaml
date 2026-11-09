@@ -164,9 +164,9 @@ content_md: |
   2. The **tabs** below it:
      - **Params** — query parameters as a table; whatever you type here automatically appears in the address after `?`;
      - **Headers** — headers;
-     - **Body** — the body. `none` — no body, `raw JSON` — a field for JSON. If the JSON is broken, a red hint appears under the field;
-     - **Console** — a log: what exactly was sent to the server and what came back.
-  3. The **response** at the bottom: the status code (coloured: green — 2xx, yellow — 4xx, red — 5xx), the time, the size and the response body.
+     - **Body** — the body. `none` — no body, `raw JSON` — a field for JSON. If the JSON is broken, a red hint appears under the field.
+  3. The **response** below: the status code (coloured: green — 2xx, yellow — 4xx, red — 5xx), the time, the size and the response body.
+  4. **Console** — a button in the window's bottom bar. It opens a log below the response: what exactly was sent to the server and what came back.
 
   **The address is always full.** The practice server runs on this same site, so the tasks give its full address: `{{BASE_URL}}/api/echo`. The protocol is `http://` or `https://`, the host is the site's address, the path is `/api/echo` (see section 1.3). The mini-Postman puts this address into the request line for you.
 
@@ -194,7 +194,7 @@ content_md: |
   - **Workspace** — the space where your requests live;
   - **Collection** — a folder for saved requests, so you don't have to rebuild them;
   - **Authorization** — a separate tab for tokens;
-  - **Postman Console** — opens with `Ctrl+Alt+C` (`Cmd+Option+C` on Mac) or via the menu `View → Show Postman Console`.
+  - **Postman Console** — as in the mini-Postman, the **Console** button in the window's bottom bar; also `Ctrl+Alt+C` (`Cmd+Option+C` on Mac).
 
   > 💡 **Why this matters in support:** the Console is the main diagnostic tool. It shows the request as it was actually sent. If something is unclear, open the Console first.
 

@@ -134,7 +134,7 @@ tasks:
     title: "Console"
     description_md: |
       Send the `POST` request from task 1 again, then open the **Console**
-      (a tab in the mini-Postman) and find there:
+      (the button in the mini-Postman's bottom bar) and find there:
 
       - the request method;
       - the full URL;
@@ -144,8 +144,8 @@ tasks:
       - the response body.
 
       **How to do it:** build the POST from task 1 (method, body, `Content-Type`),
-      press **Send**, then open the **Console** tab and click the top row of the log —
-      it will expand. ▶ marks what was sent to the server, ◀ marks what came back.
+      press **Send**, then click **Console** in the mini-Postman's bottom bar — the log
+      opens below the response. Click its top row — it will expand. ▶ marks what was sent to the server, ◀ marks what came back.
 
       **What you should see:** you can point to where the Console shows
       `Content-Type: application/json` and the JSON you sent.
@@ -169,7 +169,7 @@ tasks:
         - {path: body.headers.content-type, contains: application/json, hint: "Add the Content-Type: application/json header."}
         - {path: body.json, exists: true, hint: "Add the JSON body from task 1."}
       require_console: true
-      console_hint: "The response is correct. Now open the Console tab and find this request there."
+      console_hint: "The response is correct. Now click Console in the mini-Postman's bottom bar and find this request there."
 
   - id: ch02-task5
     order: 5
