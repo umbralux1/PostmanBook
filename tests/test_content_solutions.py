@@ -413,6 +413,7 @@ PHASE2_SOLUTIONS: dict[str, list[Req]] = {
         put(f"/api/tickets/{PROMO}", PROMO_PUT_BAD),
         put(f"/api/tickets/{PROMO}", PROMO_PUT_OK),
     ],
+    "ch03-task10": [{"url": "/api/status/503"}],
 }
 
 PHASE2_MISTAKES: list[tuple[str, list[Req], str]] = [
@@ -462,6 +463,8 @@ PHASE2_MISTAKES: list[tuple[str, list[Req], str]] = [
         [put(f"/api/tickets/{PROMO}", PROMO_PUT_BAD), put(f"/api/tickets/{PROMO}", PROMO_PUT_BAD)],
         "details.missing",
     ),
+    ("ch03-task10", [{"url": "/api/status/502"}], "503"),
+    ("ch03-task10", [{"url": "/api/echo"}], "503"),
 ]
 
 _ID_RE = re.compile(r"\{id:([^}]+)\}")

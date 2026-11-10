@@ -330,3 +330,47 @@ tasks:
         - - {path: status, equals: 200, hint: "Добавь в тело недостающее поле (смотри details.missing в ответе 422) и отправь PUT снова."}
           - {path: body.title, equals: "Promo code does not work", hint: "Это не тот тикет — нужен «Promo code does not work», а title в теле — без изменений."}
           - {path: body.status, equals: in_progress, hint: "Тикет должен перейти в статус in_progress — оставь status в теле."}
+
+  - id: ch03-task10
+    order: 10
+    phase: 2
+    title: "Мини-тикет: 503 и эскалация"
+    description_md: |
+      Клиент пишет: «Открываю раздел заказов — „Сервис временно недоступен“. Что с
+      моим аккаунтом?» Воспроизведи ошибку и собери данные для эскалации.
+
+      **Как сделать** (заголовки `X-Student-Id` и `X-Task-Code: ch03-task10`):
+
+      1. `GET {{BASE_URL}}/api/status/503` — учебный адрес, который всегда отвечает
+         `503 Service Unavailable`.
+      2. Во вкладке **Headers** ответа найди `X-Request-ID`. В теле ответа то же
+         значение лежит в поле `request_id` — сравни их.
+
+      **Что должно быть:** статус `503`, в теле — `request_id`, в заголовках ответа —
+      `X-Request-ID`.
+
+      **Ответь себе:** кто виноват — клиент или сервер? Что написать клиенту и что —
+      разработчикам?
+
+      <details markdown="1">
+      <summary>Проверь себя</summary>
+
+      Клиент не виноват: `5xx` — проблема на стороне сервера, исправить запрос он не
+      может. Клиенту: «Сбой на нашей стороне, мы уже передали его разработчикам.
+      Попробуйте повторить чуть позже — данные не пострадали».
+
+      Эскалация разработчикам:
+
+      > `GET /api/status/503` → `503 Service Unavailable`, время: 14:32 (UTC+3),
+      > X-Request-ID: `3f2c…` (полностью из заголовка), тело ответа — во вложении.
+
+      Токены и пароли в эскалацию не кладём (раздел 3.5).
+
+      </details>
+    expected:
+      request: {method: GET, path: /api/status/503}
+      response:
+        - {path: status, equals: 503, hint: "Нужен ответ 503. Отправь GET {{BASE_URL}}/api/status/503."}
+        - {path: body.status, equals: 503, hint: "Запрос ушёл не туда — нужен адрес {{BASE_URL}}/api/status/503."}
+        - {path: body.request_id, exists: true, hint: "В теле ответа 503 должно быть поле request_id."}
+        - {path: headers.x-request-id, exists: true, hint: "В заголовках ответа нет X-Request-ID."}

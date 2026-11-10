@@ -323,3 +323,48 @@ tasks:
         - - {path: status, equals: 200, hint: "Add the missing field to the body (see details.missing in the 422 response) and send the PUT again."}
           - {path: body.title, equals: "Promo code does not work", hint: "That's not the right ticket — you need “Promo code does not work”, with the title in the body unchanged."}
           - {path: body.status, equals: in_progress, hint: "The ticket should move to in_progress — keep status in the body."}
+
+  - id: ch03-task10
+    order: 10
+    phase: 2
+    title: "Mini-ticket: 503 and escalation"
+    description_md: |
+      A customer writes: “I open the orders section and get ‘Service temporarily
+      unavailable’. What's wrong with my account?” Reproduce the error and collect the
+      data for an escalation.
+
+      **How to do it** (headers `X-Student-Id` and `X-Task-Code: ch03-task10`):
+
+      1. `GET {{BASE_URL}}/api/status/503` — a training address that always answers
+         `503 Service Unavailable`.
+      2. In the response **Headers** tab, find `X-Request-ID`. The response body has the
+         same value in the `request_id` field — compare them.
+
+      **What you should get:** status `503`, `request_id` in the body, `X-Request-ID` in
+      the response headers.
+
+      **Ask yourself:** whose fault is it — the customer's or the server's? What do you
+      tell the customer, and what do you send to the developers?
+
+      <details markdown="1">
+      <summary>Check yourself</summary>
+
+      The customer isn't at fault: `5xx` is a server-side problem, and fixing the request
+      won't help. To the customer: “It's a failure on our side, we've already passed it
+      to the developers. Please try again a bit later — your data is safe.”
+
+      Escalation to the developers:
+
+      > `GET /api/status/503` → `503 Service Unavailable`, time: 14:32 (UTC+3),
+      > X-Request-ID: `3f2c…` (full value from the header), response body attached.
+
+      Never put tokens or passwords in an escalation (section 3.5).
+
+      </details>
+    expected:
+      request: {method: GET, path: /api/status/503}
+      response:
+        - {path: status, equals: 503, hint: "A 503 response is needed. Send GET {{BASE_URL}}/api/status/503."}
+        - {path: body.status, equals: 503, hint: "The request went to the wrong address — you need {{BASE_URL}}/api/status/503."}
+        - {path: body.request_id, exists: true, hint: "The 503 response body should have a request_id field."}
+        - {path: headers.x-request-id, exists: true, hint: "There's no X-Request-ID in the response headers."}
