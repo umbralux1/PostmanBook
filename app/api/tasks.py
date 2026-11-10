@@ -1,21 +1,27 @@
-"""Служебные эндпоинты заданий: фаза 1 (результат, действия), фаза 2 (last/stream)."""
+"""Служебные эндпоинты заданий: засчитывание (фазы 1–2) и журнал ученика (фаза 2)."""
 
+from datetime import datetime, timedelta
 from typing import Any
+from uuid import UUID
 
 from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
-from sqlmodel import col, select
+from sqlmodel import Session, col, select
 
 from app.api.rooms import credit_room
+from app.db import get_engine
 from app.dependencies import RATE_LIMIT, RequiredUserDep, SessionDep, limiter
 from app.errors import ApiError
+from app.i18n import get_lang
 from app.models import Attempt, ReceivedRequest, Task
+from app.models.user import utcnow
 from app.services import recorder
 from app.services.room_hub import hub
 from app.services.sse import broker
 
 router = APIRouter(prefix="/api/tasks", tags=["tasks"])
+journal_router = APIRouter(prefix="/api/journal", tags=["tasks"])
 
 
 def get_task_or_404(session: SessionDep, task_code: str) -> Task:
@@ -27,46 +33,46 @@ def get_task_or_404(session: SessionDep, task_code: str) -> Task:
     return task
 
 
-def received_out(r: ReceivedRequest) -> dict[str, Any]:
+def _journal_since() -> datetime:
+    return utcnow() - timedelta(minutes=recorder.JOURNAL_MINUTES)
+
+
+@journal_router.get("")
+@limiter.limit(RATE_LIMIT)
+def journal(request: Request, session: SessionDep, user: RequiredUserDep) -> dict[str, Any]:
+    """Запросы ученика из настоящего Postman за последние 30 минут (старые → новые).
+
+    Ученик определяется по cookie сайта, а не по коду в URL: чужой журнал не увидеть.
+    """
+    stmt = (
+        select(ReceivedRequest)
+        .where(ReceivedRequest.student_code == user.student_code)
+        .where(col(ReceivedRequest.received_at) >= _journal_since())
+        .order_by(col(ReceivedRequest.received_at).desc())
+        .limit(recorder.JOURNAL_LIMIT)
+    )
+    rows = list(reversed(session.exec(stmt).all()))
+    lang = get_lang(request)
     return {
-        "id": str(r.id),
-        "task_code": r.task_code,
-        "method": r.method,
-        "path": r.path,
-        "query": r.query,
-        "headers": r.headers,
-        "body": r.body,
-        "received_at": r.received_at.isoformat(),
-        "validated": r.validated,
-        "validation": r.validation_result or None,
+        "student_code": user.student_code,
+        "items": [recorder.journal_entry(session, r, lang) for r in rows],
     }
 
 
-@router.get("/{task_code}/last")
+@journal_router.get("/stream")
 @limiter.limit(RATE_LIMIT)
-def last_request(request: Request, task_code: str, session: SessionDep) -> dict[str, Any]:
-    """Последний запрос с этим X-Task-Code (для поллинга в фазе 2)."""
-    stmt = (
-        select(ReceivedRequest)
-        .where(ReceivedRequest.task_code == task_code)
-        .order_by(col(ReceivedRequest.received_at).desc())
-        .limit(1)
-    )
-    r = session.exec(stmt).first()
-    if r is None:
-        raise ApiError(404, "no_requests", "Запросов с этим кодом пока не было.")
-    return received_out(r)
+async def journal_stream(request: Request, user: RequiredUserDep) -> StreamingResponse:
+    """SSE: событие `request` с записью журнала при каждом новом запросе ученика."""
+    lang = get_lang(request)
+    channel = recorder.topic(user.student_code)
 
-
-@router.get("/{task_code}/stream")
-@limiter.limit(RATE_LIMIT)
-async def stream(request: Request, task_code: str) -> StreamingResponse:
-    """SSE: событие `request` при каждом новом запросе с этим X-Task-Code."""
-    if len(task_code) > recorder.MAX_TASK_CODE_LEN:
-        raise ApiError(400, "bad_task_code", "Слишком длинный код задания.")
+    def load(event: dict[str, Any]) -> dict[str, Any] | None:
+        with Session(get_engine()) as s:
+            r = s.get(ReceivedRequest, UUID(str(event.get("id"))))
+            return recorder.journal_entry(s, r, lang) if r is not None else None
 
     async def gen() -> Any:
-        async for chunk in broker.subscribe(task_code):
+        async for chunk in broker.subscribe(channel, transform=load):
             if await request.is_disconnected():
                 break
             yield chunk
@@ -93,26 +99,29 @@ async def complete_task(
     session: SessionDep,
     user: RequiredUserDep,
 ) -> dict[str, Any]:
-    """Фаза 1: фронт проверил ответ сервера и сообщает, что задание выполнено.
+    """Фронт проверил ответ(ы) сервера (checker.js) и сообщает, что задание выполнено.
 
-    Мини-Postman в комнате общий, поэтому задание засчитывается всем, кто
-    сейчас онлайн в комнате пользователя.
+    Фаза 1: мини-Postman в комнате общий, поэтому задание засчитывается всем, кто
+    сейчас онлайн в комнате пользователя. Фаза 2: у каждого свой Postman и свой
+    журнал — засчитывается только себе.
     """
     task = get_task_or_404(session, task_code)
-    if task.phase != 1:
+    if task.phase not in (1, 2):
         raise ApiError(400, "wrong_phase", "Это задание засчитывается не через мини-Postman.")
-    credited = credit_room(session, user)
+    shared = task.phase == 1
+    credited = credit_room(session, user) if shared else {user.id}
+    source = "emulator" if shared else "postman"
     for user_id in credited:
         session.add(
             Attempt(
                 user_id=user_id,
                 task_id=task.id,
                 passed=True,
-                request_payload={"source": "emulator", "by": str(user.id)},
+                request_payload={"source": source, "by": str(user.id)},
                 response_payload={"responses": body.responses},
             )
         )
     session.commit()
-    if user.room_id:
+    if shared and user.room_id:
         await hub.broadcast(user.room_id, {"type": "task_completed", "task_id": task.id})
     return {"task_id": task.id, "passed": True, "credited": len(credited)}

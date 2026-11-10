@@ -1,7 +1,9 @@
 """Точка входа FastAPI."""
 
 import logging
+import re
 import time
+import uuid
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 
@@ -12,15 +14,25 @@ from slowapi.errors import RateLimitExceeded
 from sqlmodel import Session
 
 from app import pages
-from app.api import echo, external_check, progress, rooms, tasks, tickets
+from app.api import echo, external_check, limited, progress, rooms, tasks, tickets
 from app.config import BASE_DIR, get_settings, hosting_storage_warning
 from app.db import get_engine, prepare_database
 from app.dependencies import SESSION_COOKIE, limiter, new_session_token
 from app.errors import install_error_handlers
 from app.logging_setup import setup_logging
+from app.services import recorder
 from app.services.task_loader import sync_content
 
 log = logging.getLogger("trainer.http")
+
+REQUEST_ID_HEADER = "X-Request-ID"
+_REQUEST_ID_RE = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
+
+
+def request_id_for(request: Request) -> str:
+    """Свой X-Request-ID клиента (если безопасного формата) или новый uuid4."""
+    sent = request.headers.get(REQUEST_ID_HEADER, "").strip()
+    return sent if _REQUEST_ID_RE.match(sent) else str(uuid.uuid4())
 
 
 @asynccontextmanager
@@ -62,6 +74,8 @@ def create_app() -> FastAPI:
         request: Request, call_next: Callable[[Request], Awaitable[Response]]
     ) -> Response:
         is_api = request.url.path.startswith("/api/")
+        if is_api:
+            request.state.request_id = request_id_for(request)
         issued: str | None = None
         # Cookie выдаём только посетителям сайта, не запросам из Postman к API.
         if (
@@ -71,6 +85,12 @@ def create_app() -> FastAPI:
         ):
             issued = new_session_token()
             request.state.session_token = issued
+
+        # Фаза 2: запрос ученика (X-Student-Id) пишем в его журнал вместе с ответом.
+        student = recorder.student_to_record(request) if is_api else None
+        request_body = (
+            await recorder.read_request_body(request, settings.max_body_bytes) if student else b""
+        )
 
         started = time.perf_counter()
         response = await call_next(request)
@@ -86,6 +106,9 @@ def create_app() -> FastAPI:
                 max_age=60 * 60 * 24 * 365,
             )
         if is_api:
+            response.headers[REQUEST_ID_HEADER] = request.state.request_id
+            if student:
+                response = await recorder.record_exchange(request, request_body, response, student)
             log.info(
                 "api_request",
                 extra={
@@ -96,6 +119,8 @@ def create_app() -> FastAPI:
                     "duration_ms": elapsed_ms,
                     "client_ip": request.client.host if request.client else None,
                     "task_code": request.headers.get("x-task-code"),
+                    "student_id": request.headers.get("x-student-id"),
+                    "request_id": request.state.request_id,
                     "user_agent": request.headers.get("user-agent"),
                 },
             )
@@ -105,7 +130,9 @@ def create_app() -> FastAPI:
     for r in (
         echo.router,
         tickets.router,
+        limited.router,
         tasks.router,
+        tasks.journal_router,
         external_check.router,
         progress.router,
         rooms.router,

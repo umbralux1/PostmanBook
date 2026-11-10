@@ -17,6 +17,9 @@
     </div>
     <h2 class="mt-1 text-lg font-semibold text-slate-900">{{ ch.title }}</h2>
     {% if ch.meta.goal %}<p class="mt-2 text-sm text-slate-600 line-clamp-3">{{ ch.meta.goal }}</p>{% endif %}
+    {% if not item.total and not ch.meta.quiz %}
+    <p class="mt-4 text-xs text-slate-400">{{ _("Глава готовится") }}</p>
+    {% else %}
     <div class="mt-4">
       <div class="flex justify-between text-xs text-slate-500 mb-1">
         <span>{{ _("Задания: {done} из {total}", done=item.done, total=item.total) }}</span>
@@ -26,6 +29,7 @@
         <div class="h-full bg-emerald-500" style="width: {{ (100 * item.done / item.total) | round | int if item.total else 0 }}%"></div>
       </div>
     </div>
+    {% endif %}
   </a>
   {% else %}
   <p class="text-slate-500">{{ _("Глав пока нет. Добавьте YAML в app/content/chapters.") }}</p>

@@ -40,7 +40,9 @@ def session_token_of(request: Request) -> str | None:
 def get_or_create_user(session: Session, token: str) -> User:
     user = session.exec(select(User).where(User.session_token == token)).first()
     if user is None:
-        user = User(session_token=token)
+        from app.services.students import unique_student_code
+
+        user = User(session_token=token, student_code=unique_student_code(session))
         session.add(user)
         session.commit()
         session.refresh(user)

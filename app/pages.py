@@ -7,6 +7,7 @@ import markdown as md
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+from jinja2 import pass_context
 from markupsafe import Markup
 from sqlmodel import Session
 
@@ -79,6 +80,22 @@ def render_md_inline(text: str) -> Markup:
     return Markup(html)
 
 
+@pass_context
+def static_url(context: dict[str, Any], path: str) -> str:
+    """Адрес статики с версией (`?v=` — время изменения файла).
+
+    Без версии браузер (особенно Safari) берёт JS/CSS из кэша и после обновления
+    кода работает со старым `checker.js`: задания с новыми проверками не засчитываются.
+    """
+    url = str(context["request"].url_for("static", path=path))
+    try:
+        version = int((BASE_DIR / "static" / path).stat().st_mtime)
+    except OSError:
+        return url
+    return f"{url}?v={version}"
+
+
+templates.env.globals["static_url"] = static_url
 templates.env.filters["md"] = render_md
 templates.env.filters["mdi"] = render_md_inline
 templates.env.globals["settings"] = get_settings()
@@ -187,6 +204,8 @@ def chapter_page(
             "quiz_passed": quiz_task_id(ch.id) in passed,
             # Для комнаты: по id задания (пришедшему от другого участника) найти его на своём языке.
             "tasks_js": {t.id: {"title": t.title, "expected": t.expected} for t in tasks},
+            # Фаза 2: личный код для заголовка X-Student-Id в настоящем Postman.
+            "student_code": user.student_code,
         },
         session,
         user,
@@ -254,14 +273,6 @@ def _task_or_404(session: SessionDep, task_id: str, request: Request) -> Any:
     if task is None:
         raise ApiError(404, "not_found", "Задание не найдено")
     return task_view(task, get_lang(request), site_url(request))
-
-
-@router.get("/tasks/{task_id}/phase2", response_class=HTMLResponse)
-def phase2_page(
-    task_id: str, request: Request, session: SessionDep, user: RequiredUserDep
-) -> HTMLResponse:
-    task = _task_or_404(session, task_id, request)
-    return render(request, "phases/phase2_wait.html", {"task": task}, session, user)
 
 
 @router.get("/tasks/{task_id}/phase3", response_class=HTMLResponse)

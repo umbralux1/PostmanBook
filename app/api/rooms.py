@@ -25,7 +25,12 @@ def room_info(session: Session, user: User) -> dict[str, Any]:
         "code": room.id,
         "own": room.owner_id == user.id,
         "owner_name": owner.name if owner else None,
-        "me": {"id": str(user.id), "name": user.name, "color": user.color},
+        "me": {
+            "id": str(user.id),
+            "name": user.name,
+            "color": user.color,
+            "student_code": user.student_code,
+        },
         "online": hub.presence(room.id),
     }
 

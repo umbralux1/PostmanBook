@@ -15,6 +15,7 @@ from typing import Any
 
 from jsonschema import Draft202012Validator
 
+from app.i18n import SOURCE_LANG
 from app.services.hints import build_hints
 from app.services.snapshot import RequestSnapshot
 
@@ -213,14 +214,17 @@ def validate(
     actual: RequestSnapshot,
     expected: Mapping[str, Any],
     task_hints: Mapping[str, str] | None = None,
+    lang: str = SOURCE_LANG,
 ) -> Result:
     """Проверить один запрос против эталона (без учёта истории попыток)."""
     checks = run_checks(actual, expected)
     passed = bool(checks) and all(c["ok"] for c in checks)
-    return finalize(passed, checks, task_hints or {})
+    return finalize(passed, checks, task_hints or {}, lang)
 
 
-def finalize(passed: bool, checks: list[Check], task_hints: Mapping[str, str]) -> Result:
-    hints = [] if passed else build_hints(checks, task_hints)
+def finalize(
+    passed: bool, checks: list[Check], task_hints: Mapping[str, str], lang: str = SOURCE_LANG
+) -> Result:
+    hints = [] if passed else build_hints(checks, task_hints, lang)
     public = [{k: v for k, v in c.items() if k not in ("hint", "hint_params")} for c in checks]
     return {"passed": passed, "checks": public, "hints": hints}

@@ -23,7 +23,12 @@
   </div>
   <div x-show="open" x-cloak class="prose-trainer mt-3 border-t border-slate-100 pt-3 text-sm">
     {{ task.description_md | md }}
-    {% if kind == 'sequence' %}
+    {% if task.phase == 2 %}
+      <p class="text-xs text-slate-500">{{ _("Заголовки запроса из Postman:") }} <code>X-Student-Id</code> {{ _("(личный код) и") }} <code>X-Task-Code: {{ task.id }}</code>.</p>
+      {% if kind == 'ordered' %}
+      <p class="text-xs text-slate-500">{{ _("Нужно несколько ответов сервера по порядку — как в «Что должно быть».") }}</p>
+      {% endif %}
+    {% elif kind == 'sequence' %}
       <p class="text-xs text-slate-500">{{ _("Задание засчитается, когда сервер вернёт все нужные ответы — в любом порядке.") }}</p>
     {% elif kind == 'ordered' %}
       <p class="text-xs text-slate-500">{{ _("Нужно два ответа сервера по порядку: сначала ошибка, потом успех.") }}</p>

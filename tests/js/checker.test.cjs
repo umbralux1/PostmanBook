@@ -163,3 +163,13 @@ test("встроенные сообщения переводятся через 
   }
   assert.match(C.checkAssertion({ path: "body.args.page", equals: "2" }, echoGet).message, /В ответе/);
 });
+
+test("contains с объектом: в массиве есть элемент с этими полями", () => {
+  const r = resp(200, { items: [{ id: 1, title: "A", status: "open" }, { id: 2, title: "B" }], tags: ["x"] });
+  assert.equal(C.checkAssertion({ path: "body.items", contains: { title: "B" } }, r).ok, true);
+  assert.equal(C.checkAssertion({ path: "body.items", contains: { title: "A", status: "open" } }, r).ok, true);
+  assert.equal(C.checkAssertion({ path: "body.items", contains: { title: "A", status: "closed" } }, r).ok, false);
+  assert.equal(C.checkAssertion({ path: "body.items", contains: { title: "C" } }, r).ok, false);
+  assert.equal(C.checkAssertion({ path: "body.tags", contains: { title: "x" } }, r).ok, false);
+  assert.equal(C.checkAssertion({ path: "body.tags", contains: "x" }, r).ok, true);
+});

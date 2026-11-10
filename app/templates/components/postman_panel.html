@@ -1,0 +1,114 @@
+{# Фаза 2: панель «Твой Postman» — только для чтения, мини-Postman здесь нет.
+   Запросы ученик отправляет из настоящего Postman; панель показывает заголовки для
+   текущего задания, журнал запросов, которые получил сервер, и результат проверки
+   (тот же checker.js, что в фазе 1). Логика — static/js/phase2.js.
+   DOM одинаковый у всех участников комнаты: личное — через x-text / x-show, не x-if. #}
+<div x-data="postmanPanel" class="pm">
+  <div class="pm-crumbs">
+    <b>{{ _("Твой Postman") }}</b>
+    <span class="ml-auto text-xs font-normal" style="color: var(--pm-text-3)"
+          x-text="connection === 'live' ? t('журнал обновляется сам') : connection === 'lost' ? t('Соединение прервано, обнови страницу.') : t('подключаюсь…')"></span>
+  </div>
+  <div class="px-[14px] pt-2 pb-3">
+    <p class="pm-section-title">{{ _("Здесь нельзя отправить запрос — только посмотреть, что получил сервер. Отправляй запросы из настоящего Postman и добавь в Headers два заголовка:") }}</p>
+
+    <div class="rounded border border-[#e6e6e6]">
+      <div class="flex items-center gap-2 border-b border-[#e6e6e6] px-2 py-1.5">
+        <code class="w-28 shrink-0 font-semibold">X-Student-Id</code>
+        <code class="flex-1 truncate" x-text="studentCode"></code>
+        <button type="button" class="rounded px-2 py-0.5 text-xs font-medium text-white bg-[#097bed] hover:bg-[#0265d2]"
+                @click="copy(studentCode, 'student')"
+                x-text="copied === 'student' ? t('Скопировано') : t('Скопировать')"></button>
+      </div>
+      <div class="flex items-center gap-2 px-2 py-1.5">
+        <code class="w-28 shrink-0 font-semibold">X-Task-Code</code>
+        <code class="flex-1 truncate" x-text="$store.task.id || '—'"></code>
+        <button type="button" class="rounded px-2 py-0.5 text-xs font-medium text-white bg-[#097bed] hover:bg-[#0265d2] disabled:opacity-40"
+                :disabled="!$store.task.id"
+                @click="copy($store.task.id, 'task')"
+                x-text="copied === 'task' ? t('Скопировано') : t('Скопировать')"></button>
+      </div>
+    </div>
+    <p class="pm-note">
+      <span x-show="$store.task.id">{{ _("X-Student-Id — твой личный код, он один для всех заданий. X-Task-Code — код выбранного задания, меняй его вместе с заданием.") }}</span>
+      <span x-show="!$store.task.id">{{ _("Выбери задание слева — здесь появится его X-Task-Code.") }}</span>
+    </p>
+    <p class="pm-note">{{ _("Адрес учебного API:") }} <code x-text="baseUrl + '/api/…'"></code></p>
+  </div>
+
+  {# --- Результат проверки выбранного задания --- #}
+  <div class="pm-results">
+    <div class="pm-results-title">
+      <b style="color: var(--pm-text)">Test Results</b>
+      <span x-show="$store.task.id" x-text="$store.task.title"></span>
+    </div>
+    <div class="pm-banner is-ok" x-show="$store.task.id && $store.task.passed[$store.task.id]">
+      <span aria-hidden="true">✓</span>
+      <div><b>{{ _("Задание выполнено!") }}</b> {{ _("Сервер вернул именно то, что нужно. Можно переходить к следующему.") }}</div>
+    </div>
+    <p class="pm-note pb-2" x-show="$store.task.id && !$store.task.passed[$store.task.id] && !validation">{{ _("По этому заданию запросов пока не было. Жду твой запрос…") }}</p>
+    <div class="pm-banner is-warn" x-show="$store.task.id && !$store.task.passed[$store.task.id] && validation">
+      <span aria-hidden="true">!</span>
+      <div>
+        <b>{{ _("Пока не совсем так") }}</b>
+        <p class="pm-hint-text" x-show="validation?.hint" x-text="validation?.hint"></p>
+        <p class="pm-hint-text" x-show="validation?.total > 1"
+           x-text="t('Выполнено шагов: {done} из {total}', {done: validation?.done, total: validation?.total})"></p>
+      </div>
+    </div>
+    <details class="pb-1" x-show="validation?.results?.length">
+      <summary class="cursor-pointer text-xs" style="color: var(--pm-text-2)">{{ _("Что проверялось в ответе") }}</summary>
+      <div class="mt-1">
+        <template x-for="r in (validation?.results || [])" :key="r.path + r.op">
+          <div class="pm-test">
+            <span class="pm-badge" :class="r.ok ? 'pass' : 'fail'" x-text="r.ok ? 'PASS' : 'FAIL'"></span>
+            <span>
+              <code x-text="r.path"></code>
+              <span x-text="{equals: '=', contains: t('содержит'), exists: r.expected ? t('есть') : t('нет'), in: t('одно из')}[r.op]"></span>
+              <code x-show="r.op !== 'exists'" x-text="JSON.stringify(r.expected)"></code>
+              <span class="pm-fail" x-show="!r.ok && r.op !== 'exists'">— <span x-show="r.found">{{ _("пришло") }} <code class="pm-fail" x-text="JSON.stringify(r.actual)"></code></span><span x-show="!r.found">{{ _("такого поля в ответе нет") }}</span></span>
+            </span>
+          </div>
+        </template>
+      </div>
+    </details>
+  </div>
+
+  {# --- Журнал: что получил сервер (последние 30 минут) --- #}
+  <div class="pm-console">
+    <div class="pm-console-head">
+      <span>{{ _("Журнал запросов") }}</span>
+      <span class="text-xs font-normal" style="color: var(--pm-text-3)">{{ _("за последние 30 минут") }}</span>
+    </div>
+    <div class="pm-console-body">
+      <p class="pm-note" x-show="!entries.length">{{ _("Пока пусто. Отправь запрос из Postman с заголовком X-Student-Id — он появится здесь.") }}</p>
+      <div class="max-h-[28rem] overflow-auto rounded border border-[#e6e6e6]" x-show="entries.length">
+        <template x-for="e in newestFirst()" :key="e.id">
+          <div>
+            <button type="button" class="pm-console-row" @click="toggle(e.id)">
+              <span class="pm-caret" x-text="opened === e.id ? '▾' : '▸'"></span>
+              <b :style="{ color: methodColor(e.method) }" x-text="e.method"></b>
+              <span class="pm-url-cell" x-text="fullPath(e)" :title="fullPath(e)"></span>
+              <b :class="statusClass(e.response.status)" x-text="e.response.status"></b>
+              <span class="pm-time" x-text="time(e)"></span>
+            </button>
+            <div class="px-2 pb-1 pl-[26px] text-xs" x-show="e.task_code || entryNote(e)">
+              <span x-show="e.known_task" style="color: var(--pm-text-2)"
+                    x-text="'X-Task-Code: ' + e.task_code + (taskTitle(e.task_code) ? ' — ' + taskTitle(e.task_code) : '')"></span>
+              <span x-show="entryNote(e)" style="color: var(--pm-orange)" x-text="entryNote(e)"></span>
+              <template x-for="h in (e.hints || [])" :key="h">
+                <span class="block" style="color: var(--pm-orange)" x-text="h"></span>
+              </template>
+            </div>
+            <div x-show="opened === e.id" class="pm-console-detail">
+              <h4>◀ Response Headers</h4>
+              <pre x-html="prettyHeaders(e.response.headers)"></pre>
+              <h4>◀ Response Body</h4>
+              <pre class="max-h-64 overflow-auto" x-html="pretty(e.response.body)"></pre>
+            </div>
+          </div>
+        </template>
+      </div>
+    </div>
+  </div>
+</div>

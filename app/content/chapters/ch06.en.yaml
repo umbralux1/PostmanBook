@@ -1,0 +1,17 @@
+id: ch06
+title: "Debugging: the Console and common errors"
+order: 6
+phase: 3
+estimated_minutes: 75
+goal: |
+  Learn to find the cause of a problem in the Console instead of guessing.
+content_md: |
+  > **This chapter is in progress.** Theory and tasks will be added later.
+
+  What the chapter will cover:
+
+  - the Console in the real Postman;
+  - timeouts, redirects, empty responses;
+  - how to read an error body;
+  - comparing a "working" and a "broken" request;
+  - what to collect for an escalation.

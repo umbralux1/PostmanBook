@@ -1,0 +1,18 @@
+id: ch07
+title: "Final cases: the full support cycle"
+order: 7
+phase: 3
+estimated_minutes: 120
+goal: |
+  Go through the full cycle: ticket → reproduce → find the cause → verify the fix.
+content_md: |
+  > **This chapter is in progress.** Cases will be added later.
+
+  What the chapter will cover:
+
+  - from a ticket to reproducing the problem;
+  - when to solve it yourself and when to escalate;
+  - what to attach to an escalation;
+  - how to explain the cause in plain words;
+  - five cases: `400` because of JSON, `401` after a password change, `403` due to
+    permissions, `404` only on staging, `500` with a `request_id`.

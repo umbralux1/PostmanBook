@@ -1,0 +1,241 @@
+id: ch03
+title: "HTTP methods and status codes in troubleshooting"
+order: 3
+phase: 2
+estimated_minutes: 100
+goal: |
+  Learn to tell from the error code and body who is at fault: the client's request or the server.
+after_completion: |
+  After this chapter you will be able to: send requests from the real Postman; create, change and delete tickets with different methods; explain the difference between PUT and PATCH; read 201, 204, 409, 422, 429, 502 and 503 responses; find a ticket on another page of a list; and attach an X-Request-ID to an escalation.
+checklist:
+  - "I can send a request from the real Postman and add headers to it."
+  - "I know what GET, POST, PUT, PATCH and DELETE do and how PUT differs from PATCH."
+  - "I know which requests are safe to repeat and which create a duplicate."
+  - "From the response code and body I can tell who is at fault: the request or the server."
+  - "I know where to find X-Request-ID and why to attach it to an escalation."
+  - "I can page through a list with page and limit and check total."
+  - "I know what to tell a customer about 429 and where to find Retry-After."
+quiz:
+  - id: q1
+    question: "A customer clicked “Create request” twice and got two identical requests. Why?"
+    options:
+      A: "The server broke, it's a 5xx"
+      B: "POST is not idempotent: every request creates a new item"
+      C: "The customer used PUT"
+      D: "The Content-Type header was missing"
+    answer: B
+    explanation: "Repeating a POST creates one more item. GET, PUT and DELETE can be repeated without a new result, POST cannot."
+  - id: q2
+    question: "You need to change only a ticket's status. Which request fits best?"
+    options:
+      A: "`PUT` with the body `{\"status\": \"closed\"}`"
+      B: "`PATCH` with the body `{\"status\": \"closed\"}`"
+      C: "`POST` with the body `{\"status\": \"closed\"}`"
+      D: "`GET` with the parameter `?status=closed`"
+    answer: B
+    explanation: "PATCH changes only the fields you send. PUT replaces the whole ticket: without title and priority it returns 422, and it wipes a description you didn't send."
+  - id: q3
+    question: "One customer got `422` with the body `{\"details\": {\"missing\": [\"priority\"]}}`, another got `502 Bad Gateway`. Who is at fault?"
+    options:
+      A: "The server in both cases"
+      B: "The customer's request in both cases"
+      C: "422 is the customer's request (no priority field), 502 is the server, so we escalate"
+      D: "422 is the server, 502 is the customer"
+    answer: C
+    explanation: "4xx means the server understood the request and refused it: look for the mistake in the request. 5xx means a problem on the server or the services behind it: collect the details and escalate."
+  - id: q4
+    question: "A `429 Too Many Requests` response has the header `Retry-After: 7`. What does it mean?"
+    options:
+      A: "The request can be repeated in 7 seconds"
+      B: "The customer has 7 requests left"
+      C: "The server will go down in 7 seconds"
+      D: "The request must be repeated 7 times"
+    answer: A
+    explanation: "Retry-After says in how many seconds to repeat the request. To the customer: “wait a moment and try again, nothing is broken”."
+  - id: q5
+    question: "What must you attach when escalating a `503` error to developers?"
+    options:
+      A: "A screenshot of the home page"
+      B: "The user's token from the Authorization header"
+      C: "X-Request-ID, the time, the method and the request address"
+      D: "Just the text “it doesn't work for the customer”"
+    answer: C
+    explanation: "With the X-Request-ID and the time, developers will find the request in the logs. Never put a token in a ticket."
+content_md: |
+  In chapters 1–2 you worked in the built-in mini-Postman. Now it's the **real Postman**:
+  this is how you will check requests at work. Here we'll also go through the methods
+  using tickets as an example and learn to tell from the response code who is at fault.
+
+  ## 3.1. Moving to the real Postman
+
+  **Install Postman.** Download the app from postman.com (the Downloads section), install
+  and run it. You don't have to create an account: the first screen has a link like
+  “Skip and go to the app” / “Continue without an account”.
+
+  **It all looks familiar.** The Postman window is laid out like the mini-Postman: the
+  method on the left (`GET`, `POST`…), the address field next to it, the **Params**,
+  **Headers** and **Body** tabs below, the **Send** button on the right. The response is
+  at the bottom: status, time, the **Body** and **Headers** tabs. A new request tab is
+  the **+** button.
+
+  **Two headers.** The site can't see your Postman, so we sign every request with two
+  headers (the **Headers** tab, Key / Value rows):
+
+  | Key | Value | Why |
+  |---|---|---|
+  | `X-Student-Id` | your personal code | the server knows it's you: your tickets, your log |
+  | `X-Task-Code` | the task code, e.g. `ch03-task1` | the server knows which task the request is for |
+
+  Both values are in the **“Your Postman”** panel on the right (the “Copy” button).
+  Your personal code is the same for all tasks, while `X-Task-Code` changes with the
+  task. Without `X-Student-Id` the request won't get into the log; without
+  `X-Task-Code` it won't count.
+
+  **How it's checked.** The server records each of your requests together with its
+  response. The “Your Postman” panel shows the log right away, without reloading the
+  page, and compares the responses with the task. The site can't send a request for
+  you — it only shows what arrived.
+
+  > ⚠️ **The training API is a sandbox.** The tickets here are for practice: every
+  > student has their own set of 23 tickets. Break things freely: you can get the set
+  > back with `POST {{BASE_URL}}/api/tickets/reset` and the `X-Student-Id` header.
+
+  ## 3.2. Methods, using tickets as an example
+
+  The address is the same — `{{BASE_URL}}/api/tickets` — and the method sets the action:
+
+  | Request | What it does | Successful response |
+  |---|---|---|
+  | `GET /api/tickets` | list of tickets | `200` |
+  | `GET /api/tickets/5` | one ticket with `id` 5 | `200` |
+  | `POST /api/tickets` | create a ticket (body is JSON) | `201 Created` |
+  | `PUT /api/tickets/5` | replace ticket 5 entirely | `200` |
+  | `PATCH /api/tickets/5` | change only the sent fields of ticket 5 | `200` |
+  | `DELETE /api/tickets/5` | delete ticket 5 | `204 No Content` |
+
+  A ticket has the fields `title`, `priority` (`low`, `medium`, `high`), `status`
+  (`open`, `in_progress`, `closed`) and `description`. `title` and `priority` are
+  required. For `POST`, `PUT` and `PATCH` don't forget the
+  `Content-Type: application/json` header — without it the server answers `415`.
+
+  **PUT vs PATCH** is the key difference. `PUT` sends the **whole** ticket: whatever is
+  not in the body will be gone (the description is wiped, the status becomes `open`).
+  `PATCH` changes **only** the fields you send and leaves the rest alone.
+
+  ```
+  PATCH /api/tickets/5   {"status": "in_progress"}
+  → title, priority and description stay, status = in_progress
+
+  PUT /api/tickets/5     {"status": "in_progress"}
+  → 422: title and priority are missing
+  ```
+
+  > 💡 **Why this matters in support:** “the description disappeared after saving” is a
+  > common ticket. Often the cause is an app sending `PUT` with incomplete data.
+
+  ## 3.3. Idempotency: what is safe to repeat
+
+  An **idempotent** request can be repeated any number of times — the result is the same
+  as after the first one.
+
+  - `GET` changes nothing, it's always safe to repeat.
+  - `PUT` writes the same thing a second time.
+  - `DELETE`: the ticket is already gone; a repeat returns `404` but deletes nothing new.
+  - `POST` is **not idempotent**: every repeat creates a new ticket.
+
+  Hence a common ticket: “the customer clicked the button twice and got two requests”
+  (or two charges). It's not a server failure but two `POST`s. What to answer: we'll
+  delete the duplicate, and tell developers the button should be disabled after the
+  first click.
+
+  ## 3.4. Response codes in troubleshooting
+
+  From chapter 2 you know: `2xx` is success, `4xx` is a mistake in the request, `5xx` is
+  a server error. New codes in this chapter:
+
+  | Code | What it means | What we do |
+  |---|---|---|
+  | `201 Created` | created, the body has the new object with an `id` | all good |
+  | `204 No Content` | done, no body (usually after `DELETE`) | all good, an empty body is normal |
+  | `409 Conflict` | the request is fine, but the state of the data gets in the way (e.g. the ticket is closed) | read `message`: what to do first |
+  | `422 Unprocessable Entity` | the JSON is valid, but the data doesn't fit: a missing field, a wrong value | check `details` in the body: which field |
+  | `429 Too Many Requests` | too many requests | wait `Retry-After` seconds and repeat |
+  | `502 Bad Gateway` | the server got a bad response from a service behind it | escalate |
+  | `503 Service Unavailable` | the service is temporarily unavailable (overload, maintenance) | check the status page, escalate |
+
+  **The rule: `4xx` — we sort it out ourselves, `5xx` — we escalate.** With `4xx` the
+  server understood the request and explained what's wrong: read the response body
+  (`error`, `message`, `details`) and fix the request. With `5xx` the customer is not to
+  blame: collect the details and pass them to developers.
+
+  Exceptions to the rule:
+
+  - `429`: nothing needs fixing, just wait;
+  - `409`: the request is written correctly, but the state of the data is in the way:
+    change it first (e.g. reopen the ticket), then repeat.
+
+  An error body from the training API always looks the same:
+
+  ```json
+  {
+    "error": "validation_error",
+    "message": "Required fields are missing: priority",
+    "details": {"missing": ["priority"], "invalid": {}}
+  }
+  ```
+
+  ## 3.5. X-Request-ID: a request number for escalation
+
+  Every response of the training API carries the **`X-Request-ID`** header — a unique
+  request number. In Postman it's in the response **Headers** tab (don't confuse it with
+  the request Headers). The server writes the same number to its log, so a developer can
+  find this exact request in seconds. In `5xx` responses the number is also in the
+  body — the `request_id` field.
+
+  What to attach to an escalation:
+
+  - `X-Request-ID`;
+  - the time of the request;
+  - the method and address (without the token!);
+  - the status code and response body.
+
+  ## 3.6. Pagination: “I don't see it in the list” ≠ “it doesn't exist”
+
+  A list can be long, so the server returns it in **pages**:
+
+  ```
+  GET {{BASE_URL}}/api/tickets?page=2&limit=10
+  ```
+
+  - `page` — the page number (from 1);
+  - `limit` — how many items per page (10 by default here);
+  - in the response: `items` — the items on this page, `total` — how many in all,
+    `pages` — how many pages.
+
+  If a customer “can't see their ticket”, first look at `total` and `pages`: maybe the
+  ticket is simply on the next page.
+
+  ## 3.7. Rate limits: 429 and Retry-After
+
+  So that one client can't overload the server, the API has a **rate limit**: e.g. no
+  more than 3 requests in 10 seconds. Above the limit the server answers
+  `429 Too Many Requests` and the **`Retry-After`** header says in how many seconds you
+  can try again.
+
+  The training endpoint: `GET {{BASE_URL}}/api/limited` — 3 requests per 10 seconds per
+  student.
+
+  What to tell the customer: “There were too many requests in a row; this protects the
+  server. Wait N seconds and try again — your data is fine.”
+
+  ## Glossary
+
+  | Word | In plain words |
+  |---|---|
+  | Method | What to do with the address: `GET` read, `POST` create, `PUT`/`PATCH` change, `DELETE` delete |
+  | Idempotency | Repeating a request doesn't change the result (`GET`, `PUT`, `DELETE`) |
+  | `X-Request-ID` | A unique request number in a response header — to find it in the logs |
+  | Pagination | Returning a list page by page: `page`, `limit`, `total` |
+  | Rate limit | A limit on requests per time; above it — `429` |
+  | `Retry-After` | A header: in how many seconds to repeat the request |
+  | Escalation | Passing a problem to developers together with the collected details |

@@ -7,7 +7,7 @@ from fastapi import APIRouter, Request, Response
 from fastapi.responses import JSONResponse
 
 from app.config import get_settings
-from app.dependencies import RATE_LIMIT, SessionDep, limiter
+from app.dependencies import RATE_LIMIT, limiter
 from app.errors import ApiError, error_body
 from app.i18n import get_lang, translate
 from app.services import recorder
@@ -38,7 +38,7 @@ async def read_body(request: Request) -> bytes:
 
 @router.api_route("/echo", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
 @limiter.limit(RATE_LIMIT)
-async def echo(request: Request, session: SessionDep) -> JSONResponse:
+async def echo(request: Request) -> JSONResponse:
     """Вернуть всё, что пришло: метод, путь, параметры, заголовки, тело."""
     body = await read_body(request)
     snap = snapshot_from_request(request, body)
@@ -48,8 +48,6 @@ async def echo(request: Request, session: SessionDep) -> JSONResponse:
     status = 200
     if is_json_ct and snap["json_valid"] is False:
         status = 400
-
-    recorder.record(session, snap)
 
     if status == 400:
         details: dict[str, Any] = {"body_raw": snap["body_raw"]}
@@ -80,7 +78,7 @@ async def echo(request: Request, session: SessionDep) -> JSONResponse:
 
 @router.api_route("/status/{code}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
 @limiter.limit(RATE_LIMIT)
-async def status_code(code: str, request: Request, session: SessionDep) -> Response:
+async def status_code(code: str, request: Request) -> Response:
     """Вернуть запрошенный статус-код (только из белого списка)."""
     if not code.isdigit() or int(code) not in ALLOWED_STATUS_CODES:
         raise ApiError(
@@ -90,10 +88,13 @@ async def status_code(code: str, request: Request, session: SessionDep) -> Respo
             {"allowed": sorted(ALLOWED_STATUS_CODES)},
         )
     value = int(code)
-    body = await read_body(request)
-    recorder.record(session, snapshot_from_request(request, body))
+    await read_body(request)  # слишком большое тело → 413
 
     if value in _NO_BODY:
         headers = {"Location": "/api/echo"} if value in (301, 302) else None
         return Response(status_code=value, headers=headers)
-    return JSONResponse({"status": value}, status_code=value)
+    payload: dict[str, Any] = {"status": value}
+    if value >= 500:
+        # Номер запроса для эскалации — тот же, что в заголовке X-Request-ID.
+        payload["request_id"] = getattr(request.state, "request_id", None)
+    return JSONResponse(payload, status_code=value)

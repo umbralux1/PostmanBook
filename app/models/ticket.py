@@ -13,5 +13,7 @@ class Ticket(SQLModel, table=True):
     priority: str = Field(max_length=10)
     status: str = Field(default="open", max_length=20, index=True)
     description: str = ""
+    # Код ученика (X-Student-Id); None — общая песочница для запросов без кода.
+    owner: str | None = Field(default=None, index=True, max_length=6)
     created_at: datetime = Field(default_factory=utcnow)
     updated_at: datetime = Field(default_factory=utcnow)

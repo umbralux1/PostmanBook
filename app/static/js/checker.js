@@ -6,6 +6,9 @@
 // Ожидания задаются в YAML задания (поле expected) списком утверждений:
 //   { path: "body.args.user", equals: "student", hint: "..." }
 // Операторы: equals | contains | exists | in.
+// contains: подстрока в строке или элемент массива; если значение — объект, в массиве
+// должен быть элемент с этими полями (остальные поля элемента не важны):
+//   { path: "body.items", contains: { title: "SMS code not received" } }
 // path начинается с status, headers или body; дальше — ключи через точку.
 //
 // Варианты задания:
@@ -71,6 +74,15 @@
     return true;
   }
 
+  // Элемент массива подходит под contains: равен значению или (для объекта) содержит его поля.
+  function includes(item, want) {
+    if (want === null || typeof want !== "object" || Array.isArray(want)) return deepEqual(item, want);
+    if (item === null || typeof item !== "object" || Array.isArray(item)) return false;
+    return Object.keys(want).every(function (k) {
+      return Object.prototype.hasOwnProperty.call(item, k) && deepEqual(item[k], want[k]);
+    });
+  }
+
   function show(v) {
     if (v === MISSING) return tr("(нет такого поля)");
     return JSON.stringify(v);
@@ -90,7 +102,7 @@
       op = "contains";
       expected = a.contains;
       if (typeof actual === "string") ok = actual.indexOf(a.contains) !== -1;
-      else if (Array.isArray(actual)) ok = actual.indexOf(a.contains) !== -1;
+      else if (Array.isArray(actual)) ok = actual.some(function (x) { return includes(x, a.contains); });
       else ok = false;
     } else if (Object.prototype.hasOwnProperty.call(a, "exists")) {
       op = "exists";

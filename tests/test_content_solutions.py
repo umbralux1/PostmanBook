@@ -4,8 +4,13 @@
 на учебный API, берём ответы сервера и прогоняем их через тот же checker.js,
 что работает в браузере. Так ловим задания, которые нельзя решить или
 которые засчитываются за неправильный запрос.
+
+Фаза 2: запросы идут «из Postman» (без cookie) с заголовками X-Student-Id и X-Task-Code,
+а история для checker.js берётся из журнала ученика (`GET /api/journal`) — как на
+странице главы.
 """
 
+import asyncio
 import json
 import re
 import shutil
@@ -25,20 +30,21 @@ NODE = shutil.which("node")
 CONTENT_DIR = ROOT / "app/content"
 
 
-def _phase1(files: list[TasksFile]) -> dict[str, dict[str, Any]]:
-    return {t.id: t.model_dump() for f in files for t in f.tasks if t.phase == 1}
+def _tasks(files: list[TasksFile]) -> dict[str, dict[str, Any]]:
+    return {t.id: t.model_dump() for f in files for t in f.tasks if t.phase in (1, 2)}
 
 
 # Все главы, а не только ch01: задание без эталонного решения роняет
-# test_every_phase1_task_has_solution.
+# test_every_phase1_task_has_solution / test_every_phase2_task_has_solution.
 TASKS_BY_LANG = {
-    SOURCE_LANG: _phase1(load_task_files(CONTENT_DIR)),
+    SOURCE_LANG: _tasks(load_task_files(CONTENT_DIR)),
     **{
-        lang: _phase1(list(by_chapter.values()))
+        lang: _tasks(list(by_chapter.values()))
         for lang, by_chapter in load_task_translations(CONTENT_DIR).items()
     },
 }
-TASKS = TASKS_BY_LANG[SOURCE_LANG]
+TASKS = {k: v for k, v in TASKS_BY_LANG[SOURCE_LANG].items() if v["phase"] == 1}
+PHASE2_TASKS = {k: v for k, v in TASKS_BY_LANG[SOURCE_LANG].items() if v["phase"] == 2}
 CYRILLIC = re.compile(r"[А-Яа-яЁё]")
 
 pytestmark = pytest.mark.skipif(NODE is None, reason="нужен Node.js для запуска checker.js")
@@ -356,3 +362,227 @@ async def test_mistake_fails_with_english_hint(
     assert result["passed"] is False
     assert result["hint"], "подсказка не должна быть пустой"
     assert not CYRILLIC.search(result["hint"]), result["hint"]
+
+
+# ---------- Фаза 2: настоящий Postman ----------
+# url может содержать {id:<название>} — id тикета ученика с этим названием (ищется
+# перед запросом, как ученик ищет его в списке). {"sleep": N} — пауза (ожидание Retry-After).
+
+NEW_TICKET = '{"title": "Test ticket", "priority": "medium"}'
+LOGIN = "{id:Cannot log in to my account}"
+EMAIL = "{id:How do I change my email?}"
+PROMO = "{id:Promo code does not work}"
+PROMO_PUT_BAD = '{"title": "Promo code does not work", "status": "in_progress"}'
+PROMO_PUT_OK = '{"title": "Promo code does not work", "priority": "low", "status": "in_progress"}'
+
+
+def patch(url: str, body: str) -> Req:
+    return {"method": "PATCH", "url": url, "headers": JSON_CT, "body": body}
+
+
+def put(url: str, body: str) -> Req:
+    return {"method": "PUT", "url": url, "headers": JSON_CT, "body": body}
+
+
+PHASE2_SOLUTIONS: dict[str, list[Req]] = {
+    "ch03-task1": [{"url": "/api/echo"}],
+    "ch03-task2": [{"url": "/api/tickets"}],
+    "ch03-task3": [
+        {"method": "POST", "url": "/api/tickets", "headers": JSON_CT, "body": NEW_TICKET}
+    ],
+    "ch03-task4": [
+        {"url": "/api/tickets"},
+        patch(f"/api/tickets/{LOGIN}", '{"status": "in_progress"}'),
+    ],
+    "ch03-task5": [
+        {"method": "POST", "url": "/api/tickets", "headers": JSON_CT, "body": NEW_TICKET},
+        {"method": "DELETE", "url": "/api/tickets/{id:Test ticket}"},
+        {"url": "/api/tickets/{last_deleted}"},
+    ],
+    "ch03-task6": [patch(f"/api/tickets/{EMAIL}", '{"priority": "high"}')],
+    "ch03-task7": [{"url": "/api/tickets"}, {"url": "/api/tickets?page=2"}],
+    "ch03-task8": [
+        {"url": "/api/limited"},
+        {"url": "/api/limited"},
+        {"url": "/api/limited"},
+        {"url": "/api/limited"},
+        {"sleep": 1.1},
+        {"url": "/api/limited"},
+    ],
+    "ch03-task9": [
+        put(f"/api/tickets/{PROMO}", PROMO_PUT_BAD),
+        put(f"/api/tickets/{PROMO}", PROMO_PUT_OK),
+    ],
+}
+
+PHASE2_MISTAKES: list[tuple[str, list[Req], str]] = [
+    ("ch03-task1", [{"method": "POST", "url": "/api/echo"}], "GET"),
+    ("ch03-task1", [{"url": "/api/ech0"}], "/api/echo"),
+    ("ch03-task2", [{"url": "/api/echo"}], "items"),
+    ("ch03-task3", [{"method": "POST", "url": "/api/tickets", "body": NEW_TICKET}], "Content-Type"),
+    (
+        "ch03-task3",
+        [
+            {
+                "method": "POST",
+                "url": "/api/tickets",
+                "headers": JSON_CT,
+                "body": '{"title": "Test ticket", "priority": "medium", "status": "closed"}',
+            }
+        ],
+        "open",
+    ),
+    ("ch03-task4", [put(f"/api/tickets/{LOGIN}", '{"status": "in_progress"}')], "PUT"),
+    (
+        "ch03-task4",
+        [
+            put(
+                f"/api/tickets/{LOGIN}",
+                '{"title": "Cannot log in to my account", "priority": "high",'
+                ' "status": "in_progress"}',
+            )
+        ],
+        "PUT",
+    ),
+    ("ch03-task4", [patch(f"/api/tickets/{PROMO}", '{"status": "in_progress"}')], "не тот тикет"),
+    ("ch03-task5", [{"url": "/api/tickets/999999"}], "удали"),
+    ("ch03-task5", [{"method": "DELETE", "url": f"/api/tickets/{PROMO}"}], "GET"),
+    ("ch03-task6", [patch(f"/api/tickets/{PROMO}", '{"priority": "high"}')], "409"),
+    ("ch03-task7", [{"url": "/api/tickets"}], "page = 2"),
+    ("ch03-task7", [{"url": "/api/tickets?page=2&limit=20"}], "limit"),
+    ("ch03-task8", [{"url": "/api/limited"}, {"url": "/api/limited"}], "429"),
+    (
+        "ch03-task8",
+        [{"url": "/api/limited"}] * 5,
+        "Retry-After",
+    ),
+    ("ch03-task9", [put(f"/api/tickets/{PROMO}", PROMO_PUT_OK)], "воспроизведи"),
+    (
+        "ch03-task9",
+        [put(f"/api/tickets/{PROMO}", PROMO_PUT_BAD), put(f"/api/tickets/{PROMO}", PROMO_PUT_BAD)],
+        "details.missing",
+    ),
+]
+
+_ID_RE = re.compile(r"\{id:([^}]+)\}")
+
+
+async def site_student_code(client: AsyncClient) -> str:
+    code: str = (await client.get("/api/room")).json()["me"]["student_code"]
+    return code
+
+
+async def ticket_id(postman: AsyncClient, code: str, title: str) -> int:
+    """Id тикета ученика по названию (запрос без X-Task-Code — в историю задания не входит)."""
+    r = await postman.get("/api/tickets?limit=100", headers={"X-Student-Id": code})
+    for t in r.json()["items"]:
+        if t["title"] == title:
+            return int(t["id"])
+    return 999_999
+
+
+def entry_response(entry: dict[str, Any]) -> dict[str, Any]:
+    """Запись журнала → ответ для checker.js (как normalizeResponse в phase2.js)."""
+    resp = entry["response"]
+    text = resp["body"]
+    body: Any = None
+    if text.strip():
+        try:
+            body = json.loads(text)
+        except ValueError:
+            body = text
+    return {"status": resp["status"], "headers": resp["headers"], "body": body}
+
+
+async def run_phase2(
+    client: AsyncClient,
+    postman: AsyncClient,
+    task_id: str,
+    requests: list[Req],
+    *,
+    student_header: bool = True,
+    task_header: bool = True,
+) -> list[dict[str, Any]]:
+    """Отправить запросы «из Postman» и вернуть историю задания из журнала ученика."""
+    code = await site_student_code(client)
+    deleted: int | None = None
+    for req in requests:
+        if "sleep" in req:
+            await asyncio.sleep(req["sleep"])
+            continue
+        url = req["url"]
+        for title in _ID_RE.findall(url):
+            url = url.replace(f"{{id:{title}}}", str(await ticket_id(postman, code, title)))
+        url = url.replace("{last_deleted}", str(deleted))
+        headers = dict(req.get("headers") or {})
+        if student_header:
+            headers["X-Student-Id"] = code
+        if task_header:
+            headers["X-Task-Code"] = task_id
+        method = req.get("method", "GET")
+        await postman.request(method, url, headers=headers, content=req.get("body"))
+        if method == "DELETE":
+            deleted = int(url.rsplit("/", 1)[1])
+    items = (await client.get("/api/journal")).json()["items"]
+    return [entry_response(e) for e in items if e["task_code"] == task_id]
+
+
+@pytest.fixture
+def short_limit() -> Any:
+    """Окно /api/limited — 1 с вместо 10, чтобы не ждать Retry-After в тестах."""
+    from app.services import limited
+
+    old = limited.window.window
+    limited.window.window = 1.0
+    yield
+    limited.window.window = old
+
+
+def test_every_phase2_task_has_solution() -> None:
+    assert set(PHASE2_SOLUTIONS) == set(PHASE2_TASKS)
+
+
+@pytest.mark.parametrize("lang", [SOURCE_LANG, "en"])
+@pytest.mark.parametrize("task_id", sorted(PHASE2_SOLUTIONS))
+async def test_phase2_solution_passes(
+    client: AsyncClient, postman: AsyncClient, short_limit: Any, task_id: str, lang: str
+) -> None:
+    history = await run_phase2(client, postman, task_id, PHASE2_SOLUTIONS[task_id])
+    result = evaluate(task_id, history, lang=lang)
+    assert result["passed"] is True, result
+
+
+@pytest.mark.parametrize("missing", ["student", "task"])
+@pytest.mark.parametrize("task_id", sorted(PHASE2_SOLUTIONS))
+async def test_phase2_needs_both_headers(
+    client: AsyncClient, postman: AsyncClient, short_limit: Any, task_id: str, missing: str
+) -> None:
+    """Эталон без одного из заголовков не засчитывается: в истории задания пусто."""
+    history = await run_phase2(
+        client,
+        postman,
+        task_id,
+        PHASE2_SOLUTIONS[task_id],
+        student_header=missing != "student",
+        task_header=missing != "task",
+    )
+    assert history == []
+    assert evaluate(task_id, history)["passed"] is False
+
+
+@pytest.mark.parametrize(("task_id", "requests", "hint_part"), PHASE2_MISTAKES)
+async def test_phase2_mistake_fails_with_hint(
+    client: AsyncClient,
+    postman: AsyncClient,
+    short_limit: Any,
+    task_id: str,
+    requests: list[Req],
+    hint_part: str,
+) -> None:
+    history = await run_phase2(client, postman, task_id, requests)
+    result = evaluate(task_id, history)
+    assert result["passed"] is False
+    assert hint_part in result["hint"], result["hint"]
+    en = evaluate(task_id, history, lang="en")
+    assert en["passed"] is False and en["hint"]
+    assert not CYRILLIC.search(en["hint"]), en["hint"]

@@ -1,0 +1,17 @@
+id: ch04
+title: "Authorization and tokens"
+order: 4
+phase: 2
+estimated_minutes: 75
+goal: |
+  Learn to tell `401` from `403` and explain the difference to a user.
+content_md: |
+  > **This chapter is in progress.** Theory and tasks will be added later.
+
+  What the chapter will cover:
+
+  - the `Authorization` header: Bearer, API Key, Basic;
+  - the Authorization tab in Postman;
+  - `401` vs `403`: what's the difference;
+  - expired and revoked tokens;
+  - what to do with tokens users send in tickets.

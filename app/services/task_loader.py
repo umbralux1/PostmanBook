@@ -52,7 +52,7 @@ class Assertion(BaseModel):
 
     path: str = Field(pattern=r"^(status|headers|body)(\.[^.]+)*$")
     equals: Any = None
-    contains: str | None = None
+    contains: str | dict[str, Any] | None = None  # объект — элемент массива с этими полями
     exists: bool | None = None
     in_: list[Any] | None = Field(default=None, alias="in")
     hint: str = ""
@@ -71,7 +71,11 @@ class Assertion(BaseModel):
 
 
 class ResponseCheck(BaseModel):
-    """Фаза 1: каким должен быть ответ (или серия ответов) сервера."""
+    """Фазы 1–2: каким должен быть ответ (или серия ответов) сервера (checker.js).
+
+    `request` (только фаза 2) — эталон запроса для подсказок validator.py в журнале:
+    method, path, query, headers, body. На засчитывание не влияет.
+    """
 
     model_config = ConfigDict(extra="forbid")
 
@@ -80,6 +84,7 @@ class ResponseCheck(BaseModel):
     ordered: bool = False
     require_console: bool = False
     console_hint: str = ""
+    request: dict[str, Any] | None = None
 
     @model_validator(mode="after")
     def _response_or_steps(self) -> "ResponseCheck":
@@ -105,9 +110,13 @@ class TaskItem(BaseModel):
         return v
 
     @model_validator(mode="after")
-    def _phase1_checks_response(self) -> "TaskItem":
-        if self.phase == 1:
-            ResponseCheck.model_validate(self.expected)
+    def _checks_response(self) -> "TaskItem":
+        if self.phase in (1, 2):
+            check = ResponseCheck.model_validate(self.expected)
+            if self.phase == 1 and check.request is not None:
+                raise ValueError(f"{self.id}: expected.request — только для фазы 2")
+            if self.phase == 2 and check.require_console:
+                raise ValueError(f"{self.id}: require_console — только для мини-Postman (фаза 1)")
         return self
 
 

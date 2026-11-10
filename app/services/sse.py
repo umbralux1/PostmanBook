@@ -1,4 +1,4 @@
-"""Простой in-process брокер событий для SSE (фаза 2).
+"""Простой in-process брокер событий для SSE (фаза 2: журнал ученика).
 
 Подходит для одного процесса uvicorn. Для нескольких воркеров замените
 на Redis pub/sub — интерфейс publish/subscribe останется тем же.
@@ -7,7 +7,7 @@
 import asyncio
 import json
 from collections import defaultdict
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from typing import Any
 
 
@@ -25,8 +25,17 @@ class Broker:
                 q.put_nowait(event)
         return len(queues)
 
-    async def subscribe(self, topic: str, heartbeat: float = 15.0) -> AsyncIterator[str]:
-        """Генератор строк в формате text/event-stream."""
+    async def subscribe(
+        self,
+        topic: str,
+        heartbeat: float = 15.0,
+        transform: Callable[[dict[str, Any]], dict[str, Any] | None] | None = None,
+    ) -> AsyncIterator[str]:
+        """Генератор строк в формате text/event-stream.
+
+        transform — превратить событие в данные для подписчика (в отдельном потоке:
+        может читать БД); None от него — событие пропускается.
+        """
         queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
         self._subscribers[topic].add(queue)
         try:
@@ -37,6 +46,11 @@ class Broker:
                 except TimeoutError:
                     yield ": ping\n\n"
                     continue
+                if transform is not None:
+                    shaped = await asyncio.to_thread(transform, event)
+                    if shaped is None:
+                        continue
+                    event = shaped
                 data = json.dumps(event, ensure_ascii=False, default=str)
                 yield f"event: request\ndata: {data}\n\n"
         finally:

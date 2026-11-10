@@ -23,7 +23,10 @@ _PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     ("*.py", re.compile(r"""\b(?:N_|translate)\(\s*(?:"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)')""")),
     (
         "*.py",
-        re.compile(r"""ApiError\(\s*\d+,\s*"[^"]*",\s*"((?:[^"\\]|\\.)*)"()""", re.S),
+        re.compile(
+            r"""ApiError\(\s*\d+,\s*"[^"]*",\s*(?:"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)')""",
+            re.S,
+        ),
     ),
 ]
 

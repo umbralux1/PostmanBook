@@ -12,6 +12,7 @@ from app.config import get_settings
 from app.db import create_tables, make_engine, set_engine
 from app.dependencies import SESSION_COOKIE, limiter
 from app.main import app
+from app.services import limited
 from app.services.task_loader import sync_content
 
 
@@ -23,6 +24,7 @@ def engine() -> Iterator[object]:
     with Session(eng) as s:
         sync_content(s, get_settings().content_dir)
     limiter.enabled = False
+    limited.window.reset()
     yield eng
     eng.dispose()
 

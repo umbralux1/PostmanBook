@@ -4,13 +4,25 @@
   <script>
     window.TASKS = {{ tasks_js | tojson }};
     window.TASK_ORDER = {{ tasks | map(attribute="id") | list | tojson }};
+    window.CHAPTER_PHASE = {{ chapter.phase | tojson }};
+    {% if chapter.phase == 2 %}window.STUDENT_CODE = {{ student_code | tojson }};{% endif %}
   </script>
+{% endblock %}
+{# Фаза 2: мини-Postman (builder.js) не подключается — запросы идут из настоящего Postman. #}
+{% block page_scripts %}
+  {% if chapter.phase == 2 %}
+  <script src="{{ static_url('js/phase2.js') }}"></script>
+  {% else %}
+  <script src="{{ static_url('js/builder.js') }}"></script>
+  {% endif %}
 {% endblock %}
 {% block header_right %}
   <span class="text-slate-500 hidden sm:inline">{{ _("Глава {n}", n=chapter.order) }}</span>
+  {% if tasks %}
   <span hx-get="/partials/progress/{{ chapter.id }}" hx-trigger="progress-changed from:body" hx-swap="innerHTML">
     {% with done=done, total=tasks|length %}{% include "components/progress_badge.html" %}{% endwith %}
   </span>
+  {% endif %}
 {% endblock %}
 
 {% block content %}
@@ -39,13 +51,19 @@
       {{ chapter.content_md | md }}
     </article>
 
+    {% if tasks %}
     <h2 class="mt-8 text-xl font-bold text-slate-900">{{ _("Задания") }}</h2>
+    {% if chapter.phase == 2 %}
+    <p class="text-sm text-slate-500 mt-1">{{ _("Нажми «Решать» и отправь запрос из настоящего Postman с двумя заголовками из панели «Твой Postman». Проверка — автоматическая.") }}</p>
+    {% else %}
     <p class="text-sm text-slate-500 mt-1">{{ _("Нажми «Решать», собери запрос в мини-Postman и отправь. Проверка — автоматическая.") }}</p>
+    {% endif %}
     <div id="tasks-list" class="mt-4 space-y-3">
       {% for task in tasks %}
         {% include "components/task_card.html" %}
       {% endfor %}
     </div>
+    {% endif %}
 
     {% if chapter.meta.checklist %}
     <section class="mt-10 rounded-xl bg-white border border-slate-200 p-6"
@@ -101,12 +119,18 @@
     {% endif %}
   </div>
 
-  {# ---------- Правая колонка: мини-Postman ---------- #}
+  {# ---------- Правая колонка: мини-Postman (фаза 1) или панель «Твой Postman» (фаза 2) ---------- #}
   {# На десктопе колонка не выше окна и прокручивается сама, не двигая теорию. #}
   <aside class="min-w-0">
+    {% if chapter.phase == 2 %}
+    <div id="postman-panel" class="lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto lg:overscroll-contain">
+      {% include "components/postman_panel.html" %}
+    </div>
+    {% else %}
     <div id="builder" class="lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto lg:overscroll-contain">
       {% include "components/request_builder.html" %}
     </div>
+    {% endif %}
   </aside>
 </div>
 {% endblock %}

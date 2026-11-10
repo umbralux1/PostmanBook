@@ -1,0 +1,16 @@
+id: ch05
+title: "Environments and collections"
+order: 5
+phase: 2
+estimated_minutes: 60
+goal: |
+  Learn to switch environments (staging, production) without editing addresses by hand.
+content_md: |
+  > **This chapter is in progress.** Theory and tasks will be added later.
+
+  What the chapter will cover:
+
+  - Environments and the `{{base_url}}` and `{{token}}` variables;
+  - switching between staging and production;
+  - common mistakes with `{{}}`;
+  - Collections and folders, importing curl, exporting to colleagues.
