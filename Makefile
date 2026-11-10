@@ -39,8 +39,8 @@ dev: ## Запустить с автоперезагрузкой (код и YAML
 	$(BIN)/uvicorn app.main:app --reload --reload-dir app \
 		--reload-include '*.yaml' --reload-include '*.json' --host $(HOST) --port $(PORT)
 
-run: ## Запустить без автоперезагрузки
-	$(BIN)/uvicorn app.main:app --host $(HOST) --port $(PORT)
+run: ## Запустить с автоперезагрузкой кода (без слежения за YAML/JSON — для этого make dev)
+	$(BIN)/uvicorn app.main:app --host $(HOST) --port $(PORT) --reload
 
 # ---------- Качество ----------
 
