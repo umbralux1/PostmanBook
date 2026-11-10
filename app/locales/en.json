@@ -191,5 +191,9 @@
   "Запросы из Postman с заголовком X-Student-Id засчитываются этому заданию, пока оно выбрано (кнопка «Решаю»).": "Requests from Postman with the X-Student-Id header count for this task while it's selected (the “Solving” button).",
   "Здесь нельзя отправить запрос — только посмотреть, что получил сервер. Отправляй запросы из настоящего Postman и добавь в Headers заголовок:": "You can't send a request here — only see what the server received. Send requests from the real Postman and add this header in Headers:",
   "Нажми «Решать» и отправь запрос из настоящего Postman с заголовком X-Student-Id из панели «Твой Postman». Проверка — автоматическая.": "Click “Solve” and send the request from the real Postman with the X-Student-Id header from the “Your Postman” panel. The check is automatic.",
-  "Это задание решается не в настоящем Postman.": "This task is not solved in the real Postman."
+  "Это задание решается не в настоящем Postman.": "This task is not solved in the real Postman.",
+  "Не получилось, попробуй ещё раз.": "That didn't work, try again.",
+  "Начать главу заново? Прогресс по заданиям и тесту этой главы обнулится.": "Start the chapter over? Your task and quiz progress for this chapter will be cleared.",
+  "Начать главу заново: прогресс по заданиям и тесту этой главы обнулится": "Start the chapter over: task and quiz progress for this chapter will be cleared",
+  "Глава {id} не найдена.": "Chapter {id} not found."
 }

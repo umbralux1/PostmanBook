@@ -17,6 +17,9 @@
   {% endif %}
 {% endblock %}
 {% block header_right %}
+  <button type="button" onclick="resetDatabase(this, {{ chapter.id | tojson | forceescape }})"
+          title="{{ _('Начать главу заново: прогресс по заданиям и тесту этой главы обнулится') }}"
+          class="rounded-md bg-orange-600 px-3 py-1 text-xs font-semibold text-white shadow-sm hover:bg-orange-700 disabled:opacity-60">Reset database</button>
   <span class="text-slate-500 hidden sm:inline">{{ _("Глава {n}", n=chapter.order) }}</span>
   {% if tasks %}
   <span hx-get="/partials/progress/{{ chapter.id }}" hx-trigger="progress-changed from:body" hx-swap="innerHTML">

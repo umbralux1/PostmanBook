@@ -46,6 +46,9 @@
 | `POST /api/auth/change-password` (Bearer) `{old_password, new_password}` | меняет пароль, **отзывает все токены и ключи** ученика | `200`; неверный старый → `400 invalid_old_password` (токен-то верный); токен другого ученика → `403 foreign_account`; песочница → `400 student_required` |
 | `POST /api/auth/reset` | вернуть пароль `support123`, отозвать всё | `200` (упоминается в подсказках) |
 
+Кнопка **Reset database** в шапке главы делает то же (`reset: [auth]` в `ch04.yaml`) и
+обнуляет прогресс главы 4; тикеты не трогает.
+
 Ошибки `401` (у всех защищённых эндпоинтов), тело `{error, message, details}` (общий
 формат ошибок; `X-Request-ID` — в заголовке) + `WWW-Authenticate: Bearer realm="trainer"`:
 

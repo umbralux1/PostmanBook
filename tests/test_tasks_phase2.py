@@ -317,3 +317,44 @@ async def test_typo_in_api_path_is_logged(client: AsyncClient, postman: AsyncCli
     await postman.get("/api/ech0", headers=headers(code))
     items = (await client.get("/api/journal")).json()["items"]
     assert [(e["path"], e["response"]["status"]) for e in items] == [("/api/ech0", 404)]
+
+
+async def test_reset_database_chapter(client: AsyncClient, session: Session) -> None:
+    """Reset database: прогресс только этой главы и учебные данные из `reset` главы."""
+    code = await student_code(client)
+    items = (await client.get("/api/tickets?limit=100", headers=headers(code))).json()["items"]
+    target = next(t for t in items if t["title"] == "Cannot log in to my account")
+    r = await client.delete(f"/api/tickets/{target['id']}", headers=headers(code))
+    assert r.status_code == 204
+    r = await client.post(
+        "/api/auth/login",
+        json={"username": "agent", "password": "support123"},
+        headers=headers(code),
+    )
+    token = r.json()["access_token"]
+    await select_task(client, "ch03-task1")
+    for task_id in ("ch03-task1", "ch01-task1"):
+        r = await client.post(f"/api/tasks/{task_id}/complete", json={"responses": []})
+        assert r.status_code == 200, r.text
+
+    r = await client.post("/api/progress/reset", json={"chapter_id": "ch03"})
+    assert r.status_code == 200, r.text
+    assert r.json()["attempts_deleted"] == 1
+
+    items = (await client.get("/api/tickets?limit=100", headers=headers(code))).json()["items"]
+    assert any(t["title"] == "Cannot log in to my account" for t in items)
+    assert {a.task_id for a in session.exec(select(Attempt)).all()} == {"ch01-task1"}
+    # Глава 3 сбрасывает только тикеты (reset: [tickets]), токен главы 4 жив.
+    r = await client.get("/api/auth/me", headers={"Authorization": f"Bearer {token}"})
+    assert r.status_code == 200
+
+    r = await client.post("/api/progress/reset", json={"chapter_id": "ch04"})
+    assert r.status_code == 200
+    r = await client.get("/api/auth/me", headers={"Authorization": f"Bearer {token}"})
+    assert r.status_code == 401
+
+    r = await client.post("/api/progress/reset", json={"chapter_id": "ch01"})
+    assert r.status_code == 200
+    assert session.exec(select(Attempt)).all() == []
+    r = await client.post("/api/progress/reset", json={"chapter_id": "nope"})
+    assert r.status_code == 404

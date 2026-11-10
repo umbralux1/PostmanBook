@@ -6,7 +6,7 @@
 
 import logging
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -43,6 +43,9 @@ class ChapterFile(BaseModel):
     after_completion: str = ""
     checklist: list[str] = []
     quiz: list[QuizQuestion] = []
+    # Учебные данные API, которые кнопка Reset database возвращает к началу вместе с
+    # прогрессом главы: tickets — тикеты ученика, auth — учётка /api/auth и токены.
+    reset: list[Literal["tickets", "auth"]] = []
 
 
 class Assertion(BaseModel):
@@ -207,6 +210,8 @@ def check_chapter_translation(base: ChapterFile, tr: ChapterFile, lang: str) -> 
         (q.id, q.answer, sorted(q.options)) for q in base.quiz
     ]:
         raise ValueError(f"{where}: вопросы теста (id, варианты, ответы) должны совпадать")
+    if tr.reset != base.reset:
+        raise ValueError(f"{where}: reset должен совпадать с оригиналом")
     if len(tr.checklist) != len(base.checklist):
         raise ValueError(f"{where}: в чек-листе должно быть столько же пунктов")
 

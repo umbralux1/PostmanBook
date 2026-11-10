@@ -2,6 +2,7 @@ id: ch03
 title: "HTTP methods and status codes in troubleshooting"
 order: 3
 phase: 2
+reset: [tickets]  # Reset database возвращает к началу эти учебные данные
 estimated_minutes: 100
 goal: |
   Learn to tell from the error code and body who is at fault: the client's request or the server.
@@ -96,6 +97,8 @@ content_md: |
   > ⚠️ **The training API is a sandbox.** The tickets here are for practice: every
   > student has their own set of 23 tickets. Break things freely: you can get the set
   > back with `POST {{BASE_URL}}/api/tickets/reset` and the `X-Student-Id` header.
+  > The **Reset database** button in the page header starts the chapter over: tickets are
+  > back to the start, task and quiz progress is cleared.
 
   ## 3.2. Methods, using tickets as an example
 

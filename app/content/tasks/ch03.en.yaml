@@ -140,7 +140,7 @@ tasks:
     expected:
       response:
         - {path: status, equals: 200, hint: "The server didn't answer 200. You need a PATCH to {{BASE_URL}}/api/tickets/<id> with Content-Type: application/json. If you got 422, it looks like a PUT: it requires the whole ticket."}
-        - {path: body.title, equals: "Cannot log in to my account", hint: "That's not the right ticket. Find the id of “Cannot log in to my account” in the GET {{BASE_URL}}/api/tickets list."}
+        - {path: body.title, equals: "Cannot log in to my account", hint: "That's not the right ticket. Find the id of “Cannot log in to my account” in the GET {{BASE_URL}}/api/tickets list. Not in the list (you deleted it earlier)? Get the set back: POST {{BASE_URL}}/api/tickets/reset or the Reset database button in the page header (it also clears your chapter progress)."}
         - {path: body.status, equals: in_progress, hint: "The status must become in_progress. Body: {\"status\": \"in_progress\"}."}
         - {path: body.priority, equals: high, hint: "The priority changed, but it shouldn't be touched. Get the ticket set back (POST {{BASE_URL}}/api/tickets/reset) and send only status in the PATCH."}
         - {path: body.description, equals: "Says 'Wrong password', but it is correct.", hint: "The description disappeared or changed — looks like a PUT: it replaces the whole ticket. Get the ticket set back (POST {{BASE_URL}}/api/tickets/reset) and send a PATCH with status only."}

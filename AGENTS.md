@@ -93,6 +93,10 @@ uvicorn: SQLite, комнаты, SSE и rate limit живут в одном пр
   опираются задания главы 3 («SMS code not received» на 2-й странице при `limit=10`).
   Тексты на английском (решение владельца), одни для RU/EN (`expected` общий). Лимит `/api/limited` — в
   памяти процесса; в тестах его сбрасывает фикстура `engine`.
+- Кнопка **Reset database** в шапке главы (`POST /api/progress/reset`) обнуляет прогресс
+  только этой главы и только себе; учебные данные API — по полю `reset` в YAML главы
+  (`tickets`, `auth`). Новая глава фазы 2 со своими данными API → добавь вид в `reset`
+  (`ChapterFile` в `task_loader.py` и `api/progress.py`).
 - Миграции: `make migration MSG="…"`; у внешних ключей задавай имена (SQLite, batch-режим).
   При старте миграции применяются сами, в том числе к старым базам без `alembic_version`.
   Batch-режим пересоздаёт таблицу, поэтому `alembic/env.py` на время миграций SQLite

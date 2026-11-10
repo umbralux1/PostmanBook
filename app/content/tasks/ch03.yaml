@@ -145,7 +145,7 @@ tasks:
     expected:
       response:
         - {path: status, equals: 200, hint: "Сервер не ответил 200. Нужен PATCH на {{BASE_URL}}/api/tickets/<id> с Content-Type: application/json. Если пришёл 422 — похоже, это PUT: он требует тикет целиком."}
-        - {path: body.title, equals: "Cannot log in to my account", hint: "Это не тот тикет. Найди id тикета «Cannot log in to my account» в списке GET {{BASE_URL}}/api/tickets."}
+        - {path: body.title, equals: "Cannot log in to my account", hint: "Это не тот тикет. Найди id тикета «Cannot log in to my account» в списке GET {{BASE_URL}}/api/tickets. Нет его в списке (удалял раньше) — верни набор: POST {{BASE_URL}}/api/tickets/reset или кнопка Reset database в шапке страницы (она обнулит и прогресс главы)."}
         - {path: body.status, equals: in_progress, hint: "Статус должен стать in_progress. Тело: {\"status\": \"in_progress\"}."}
         - {path: body.priority, equals: high, hint: "Приоритет изменился, а трогать его не нужно. Верни набор тикетов (POST {{BASE_URL}}/api/tickets/reset) и пришли в PATCH только status."}
         - {path: body.description, equals: "Says 'Wrong password', but it is correct.", hint: "Описание пропало или изменилось — похоже, был PUT: он заменяет тикет целиком. Верни набор тикетов (POST {{BASE_URL}}/api/tickets/reset) и отправь PATCH только со status."}

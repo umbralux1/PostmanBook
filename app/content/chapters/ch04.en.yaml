@@ -2,6 +2,7 @@ id: ch04
 title: "Authorization and tokens"
 order: 4
 phase: 2
+reset: [auth]  # Reset database возвращает к началу эти учебные данные
 estimated_minutes: 75
 goal: |
   Learn to tell `401` from `403` and explain the difference to a user.
