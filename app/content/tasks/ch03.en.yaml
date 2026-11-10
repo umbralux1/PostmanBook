@@ -152,19 +152,34 @@ tasks:
   - id: ch03-task5
     order: 5
     phase: 2
-    title: "Delete and check"
+    title: "Delete a ticket"
     description_md: |
-      Delete the “Test ticket” created in task 3 and make sure it's gone.
+      Delete the “Test ticket” created in task 3.
 
       **How to do it** (headers `X-Student-Id` and `X-Task-Code: ch03-task5`):
+      `DELETE {{BASE_URL}}/api/tickets/<id>` — the `id` of the ticket from task 3
+      (forgot it? find it at the end of the list, on the last page: `?page=3`).
 
-      1. `DELETE {{BASE_URL}}/api/tickets/<id>` — the `id` of the ticket from task 3
-         (forgot it? find it at the end of the list, on the last page: `?page=3`).
-      2. Send a `GET` to the same address.
+      **What you should get:** `204 No Content`, the body is empty — that's normal: the
+      ticket is deleted and the server has nothing to return.
 
-      **What you should get:**
-      - `DELETE` → `204 No Content`, the body is empty — that's normal;
-      - then `GET` of the same address → `404 Not Found`.
+      Remember the `id` — you'll need it in the next task.
+    expected:
+      response:
+        - {path: status, equals: 204, hint: "The server didn't answer 204. You need DELETE {{BASE_URL}}/api/tickets/<id> with the id of “Test ticket”. Got 404? There's no such id: find the ticket in the GET {{BASE_URL}}/api/tickets?page=3 list."}
+
+  - id: ch03-task6
+    order: 6
+    phase: 2
+    title: "Check that it's gone"
+    description_md: |
+      Make sure the ticket deleted in task 5 is really gone.
+
+      **How to do it** (headers `X-Student-Id` and `X-Task-Code: ch03-task6`):
+      `GET {{BASE_URL}}/api/tickets/<id>` — the same address as in task 5, just with the
+      `GET` method.
+
+      **What you should get:** `404 Not Found`, with `error: "not_found"` in the body.
 
       **Ask yourself:** what will a second `DELETE` of the same ticket return? Does it
       break idempotency?
@@ -177,14 +192,12 @@ tasks:
 
       </details>
     expected:
-      ordered: true
-      steps:
-        - - {path: status, equals: 204, hint: "Delete the ticket first: DELETE {{BASE_URL}}/api/tickets/<id>. The server should answer 204."}
-        - - {path: status, equals: 404, hint: "Now check: a GET of the same address {{BASE_URL}}/api/tickets/<id> should answer 404."}
-          - {path: body.error, equals: not_found, hint: "You need a GET of the same ticket you deleted: the server should answer not_found."}
+      response:
+        - {path: status, equals: 404, hint: "A 404 is expected: the ticket is gone. Send a GET to the address of the ticket deleted in task 5: {{BASE_URL}}/api/tickets/<id>. Got 200? That ticket still exists — wrong id (or task 5 isn't done)."}
+        - {path: body.error, equals: not_found, hint: "You need a GET of the ticket deleted in task 5: the server should answer not_found. Check the address — {{BASE_URL}}/api/tickets/<id>."}
 
-  - id: ch03-task6
-    order: 6
+  - id: ch03-task7
+    order: 7
     phase: 2
     title: "Conflict"
     description_md: |
@@ -195,7 +208,7 @@ tasks:
 
       1. Find the `id` of the ticket “How do I change my email?” in the list.
       2. `PATCH {{BASE_URL}}/api/tickets/<id>` with the `X-Student-Id`,
-         `X-Task-Code: ch03-task6` and `Content-Type: application/json` headers and the
+         `X-Task-Code: ch03-task7` and `Content-Type: application/json` headers and the
          body `{"priority": "high"}`.
 
       **What you should get:** `409 Conflict`, with `error: "ticket_closed"` in the body.
@@ -218,15 +231,15 @@ tasks:
         - {path: status, equals: 409, hint: "409 Conflict is expected. Change the closed ticket “How do I change my email?” — find its id in the list. If you got 404, the id is wrong."}
         - {path: body.error, equals: ticket_closed, hint: "The error should be ticket_closed — change exactly the closed ticket."}
 
-  - id: ch03-task7
-    order: 7
+  - id: ch03-task8
+    order: 8
     phase: 2
     title: "The “invisible” ticket"
     description_md: |
       A customer writes: “I created a request **“SMS code not received”**, but it's not in
       the list! Did you lose it?”
 
-      **How to do it** (headers `X-Student-Id` and `X-Task-Code: ch03-task7`):
+      **How to do it** (headers `X-Student-Id` and `X-Task-Code: ch03-task8`):
       `GET {{BASE_URL}}/api/tickets`, and in the **Params** tab add `page` = `2`.
 
       **What you should get:** status `200`, the ticket “SMS code not received” in `items`.
@@ -250,22 +263,36 @@ tasks:
         - {path: body.page, equals: 2, hint: "This isn't the second page. Add the parameter page = 2 in Params."}
         - {path: body.items, contains: {title: "SMS code not received"}, hint: "The ticket “SMS code not received” isn't on this page. Check limit: with limit=10 it's on page 2. Deleted tickets from the set? Get it back: POST {{BASE_URL}}/api/tickets/reset."}
 
-  - id: ch03-task8
-    order: 8
+  - id: ch03-task9
+    order: 9
     phase: 2
     title: "Too often"
     description_md: |
       The training endpoint `{{BASE_URL}}/api/limited` allows 3 requests per 10 seconds.
 
-      **How to do it** (headers `X-Student-Id` and `X-Task-Code: ch03-task8`):
+      **How to do it** (headers `X-Student-Id` and `X-Task-Code: ch03-task9`):
+      send `GET {{BASE_URL}}/api/limited` several times in a row until you get
+      `429 Too Many Requests`.
 
-      1. Send `GET {{BASE_URL}}/api/limited` several times in a row until you get
-         `429 Too Many Requests`.
-      2. Find the `Retry-After` header in the response **Headers** tab — in how many
-         seconds you can try again.
-      3. Wait that long and send the request again.
+      **What you should get:** status `429`, and in the response **Headers** tab — the
+      `Retry-After` header: in how many seconds you can try again.
+    expected:
+      response:
+        - {path: status, equals: 429, hint: "A 429 response is needed. Send GET {{BASE_URL}}/api/limited several times in a row — more than 3 in 10 seconds."}
+        - {path: headers.retry-after, exists: true, hint: "The 429 response should have a Retry-After header."}
 
-      **What you should get:** first `429` with the `Retry-After` header, then `200`.
+  - id: ch03-task10
+    order: 10
+    phase: 2
+    title: "Retry after a pause"
+    description_md: |
+      The server answered `429` in task 9. Repeat the request so that it goes through.
+
+      **How to do it** (headers `X-Student-Id` and `X-Task-Code: ch03-task10`):
+      wait as many seconds as `Retry-After` said and send `GET {{BASE_URL}}/api/limited`
+      once.
+
+      **What you should get:** status `200`, with `ok: true` in the body.
 
       **Write an answer to a customer** who says “the app shows error 429”.
 
@@ -277,17 +304,14 @@ tasks:
 
       </details>
     expected:
-      ordered: true
-      steps:
-        - - {path: status, equals: 429, hint: "Get a 429 first: send GET {{BASE_URL}}/api/limited several times in a row (more than 3 in 10 seconds)."}
-          - {path: headers.retry-after, exists: true, hint: "The 429 response should have a Retry-After header."}
-        - - {path: status, equals: 200, hint: "Wait as many seconds as Retry-After says and send the request again — you need a 200."}
-          - {path: body.ok, equals: true, hint: "Repeat the request exactly to {{BASE_URL}}/api/limited."}
+      response:
+        - {path: status, equals: 200, hint: "A 200 response is needed. Got 429? It's too early: wait as many seconds as Retry-After says and send one request to {{BASE_URL}}/api/limited."}
+        - {path: body.ok, equals: true, hint: "The request went to the wrong address — you need {{BASE_URL}}/api/limited."}
 
-  - id: ch03-task9
-    order: 9
+  - id: ch03-task11
+    order: 11
     phase: 2
-    title: "Mini-ticket: 422"
+    title: "Mini-ticket: 422 — reproduce"
     description_md: |
       An integration developer writes:
 
@@ -296,29 +320,45 @@ tasks:
       > `{"title": "Promo code does not work", "status": "in_progress"}`
       > and getting `422`. What's wrong?”
 
-      **How to do it** (headers `X-Student-Id`, `X-Task-Code: ch03-task9`,
+      Reproduce the error.
+
+      **How to do it** (headers `X-Student-Id`, `X-Task-Code: ch03-task11`,
       `Content-Type: application/json`):
 
       1. Find the `id` of the ticket “Promo code does not work” — it's the 10th, the
          last one on the first page of `GET {{BASE_URL}}/api/tickets`.
-      2. **Reproduce:** `PUT {{BASE_URL}}/api/tickets/<id>`, **Body** → **raw** →
-         **JSON**, with the body exactly like the developer's:
+      2. `PUT {{BASE_URL}}/api/tickets/<id>`, **Body** → **raw** → **JSON**, with the
+         body exactly like the developer's:
 
          ```json
          {"title": "Promo code does not work", "status": "in_progress"}
          ```
 
-         The server answers `422`. Look at `details.missing` in the response body —
-         which field is missing.
-      3. **Fix it:** add that field with its previous value (`low`) and send again:
+      **What you should get:** `422`. Look at `details.missing` in the response body —
+      which field is missing.
+    expected:
+      response:
+        - {path: status, equals: 422, hint: "A 422 is expected. Send the PUT with the body exactly like the developer's — without priority. Got 200? Your body has priority, the developer's didn't; got 404 — wrong id."}
+        - {path: body.details.missing, contains: priority, hint: "The 422 should be about the missing priority field — send the body exactly like the developer's."}
 
-         ```json
-         {"title": "Promo code does not work", "priority": "low", "status": "in_progress"}
-         ```
+  - id: ch03-task12
+    order: 12
+    phase: 2
+    title: "Mini-ticket: 422 — fix"
+    description_md: |
+      Fix the developer's request from task 11 so the server accepts it.
 
-      **What you should get:** first `422`, then `200` — the ticket is `in_progress`.
+      **How to do it** (headers `X-Student-Id`, `X-Task-Code: ch03-task12`,
+      `Content-Type: application/json`): the same `PUT {{BASE_URL}}/api/tickets/<id>`,
+      but add the missing field from `details.missing` with its previous value (`low`):
 
-      **Look at the `200` response:** what happened to the `description` field?
+      ```json
+      {"title": "Promo code does not work", "priority": "low", "status": "in_progress"}
+      ```
+
+      **What you should get:** `200`, the ticket is `in_progress`.
+
+      **Look at the response:** what happened to the `description` field?
 
       <details markdown="1">
       <summary>Check yourself</summary>
@@ -341,16 +381,13 @@ tasks:
 
       </details>
     expected:
-      ordered: true
-      steps:
-        - - {path: status, equals: 422, hint: "Reproduce the error first: a PUT with the body exactly like the developer's (without priority). The server should answer 422."}
-          - {path: body.details.missing, contains: priority, hint: "The 422 should be about the missing priority field — send the body exactly like the developer's."}
-        - - {path: status, equals: 200, hint: "Add the missing field to the body (see details.missing in the 422 response) and send the PUT again."}
-          - {path: body.title, equals: "Promo code does not work", hint: "That's not the right ticket — you need “Promo code does not work”, with the title in the body unchanged."}
-          - {path: body.status, equals: in_progress, hint: "The ticket should move to in_progress — keep status in the body."}
+      response:
+        - {path: status, equals: 200, hint: "The server didn't answer 200. Got 422? The body lacks the field from details.missing: add \"priority\": \"low\"."}
+        - {path: body.title, equals: "Promo code does not work", hint: "That's not the right ticket — you need “Promo code does not work”, with the title in the body unchanged."}
+        - {path: body.status, equals: in_progress, hint: "The ticket should move to in_progress — keep status in the body."}
 
-  - id: ch03-task10
-    order: 10
+  - id: ch03-task13
+    order: 13
     phase: 2
     title: "Mini-ticket: 503 and escalation"
     description_md: |
@@ -358,7 +395,7 @@ tasks:
       unavailable’. What's wrong with my account?” Reproduce the error and collect the
       data for an escalation.
 
-      **How to do it** (headers `X-Student-Id` and `X-Task-Code: ch03-task10`):
+      **How to do it** (headers `X-Student-Id` and `X-Task-Code: ch03-task13`):
 
       1. `GET {{BASE_URL}}/api/status/503` — a training address that always answers
          `503 Service Unavailable`.

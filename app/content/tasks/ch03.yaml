@@ -156,19 +156,34 @@ tasks:
   - id: ch03-task5
     order: 5
     phase: 2
-    title: "Удалить и проверить"
+    title: "Удалить тикет"
     description_md: |
-      Удали тикет «Test ticket», созданный в задании 3, и убедись, что его больше нет.
+      Удали тикет «Test ticket», созданный в задании 3.
 
       **Как сделать** (заголовки `X-Student-Id` и `X-Task-Code: ch03-task5`):
+      `DELETE {{BASE_URL}}/api/tickets/<id>` — `id` тикета из задания 3 (забыл — найди
+      его в конце списка, на последней странице: `?page=3`).
 
-      1. `DELETE {{BASE_URL}}/api/tickets/<id>` — `id` тикета из задания 3
-         (забыл — найди его в конце списка, на последней странице: `?page=3`).
-      2. Тем же адресом отправь `GET`.
+      **Что должно быть:** `204 No Content`, тело пустое — это нормально: тикет
+      удалён, а возвращать серверу нечего.
 
-      **Что должно быть:**
-      - `DELETE` → `204 No Content`, тело пустое — это нормально;
-      - потом `GET` того же адреса → `404 Not Found`.
+      Запомни `id` — он пригодится в следующем задании.
+    expected:
+      response:
+        - {path: status, equals: 204, hint: "Сервер не ответил 204. Нужен DELETE {{BASE_URL}}/api/tickets/<id> с id тикета «Test ticket». Если пришёл 404 — такого id нет: найди тикет в списке GET {{BASE_URL}}/api/tickets?page=3."}
+
+  - id: ch03-task6
+    order: 6
+    phase: 2
+    title: "Проверить, что удалён"
+    description_md: |
+      Убедись, что тикет, удалённый в задании 5, действительно пропал.
+
+      **Как сделать** (заголовки `X-Student-Id` и `X-Task-Code: ch03-task6`):
+      `GET {{BASE_URL}}/api/tickets/<id>` — тот же адрес, что в задании 5, только метод
+      `GET`.
+
+      **Что должно быть:** `404 Not Found`, в теле `error: "not_found"`.
 
       **Ответь себе:** что вернёт повторный `DELETE` того же тикета? Это нарушает
       идемпотентность?
@@ -180,16 +195,13 @@ tasks:
       удалил, состояние данных то же, что после первого `DELETE`.
 
       </details>
-    # Два ответа по порядку: сначала 204 (удалён), потом 404 (его нет).
     expected:
-      ordered: true
-      steps:
-        - - {path: status, equals: 204, hint: "Сначала удали тикет: DELETE {{BASE_URL}}/api/tickets/<id>. Сервер должен ответить 204."}
-        - - {path: status, equals: 404, hint: "Теперь проверь: GET того же адреса {{BASE_URL}}/api/tickets/<id> должен ответить 404."}
-          - {path: body.error, equals: not_found, hint: "Нужен GET того же тикета, который ты удалил: сервер должен ответить not_found."}
+      response:
+        - {path: status, equals: 404, hint: "Ожидается 404: тикета уже нет. Отправь GET на адрес тикета, удалённого в задании 5: {{BASE_URL}}/api/tickets/<id>. Пришёл 200 — этот тикет ещё есть, id не тот (или задание 5 не выполнено)."}
+        - {path: body.error, equals: not_found, hint: "Нужен GET тикета, удалённого в задании 5: сервер должен ответить not_found. Проверь адрес — {{BASE_URL}}/api/tickets/<id>."}
 
-  - id: ch03-task6
-    order: 6
+  - id: ch03-task7
+    order: 7
     phase: 2
     title: "Конфликт"
     description_md: |
@@ -200,7 +212,7 @@ tasks:
 
       1. Найди `id` тикета «How do I change my email?» в списке.
       2. `PATCH {{BASE_URL}}/api/tickets/<id>` с заголовками `X-Student-Id`,
-         `X-Task-Code: ch03-task6`, `Content-Type: application/json` и телом
+         `X-Task-Code: ch03-task7`, `Content-Type: application/json` и телом
          `{"priority": "high"}`.
 
       **Что должно быть:** `409 Conflict`, в теле `error: "ticket_closed"`.
@@ -222,15 +234,15 @@ tasks:
         - {path: status, equals: 409, hint: "Ожидается 409 Conflict. Меняй закрытый тикет «How do I change my email?» — найди его id в списке. Если пришёл 404 — id не тот."}
         - {path: body.error, equals: ticket_closed, hint: "Ошибка должна быть ticket_closed — меняй именно закрытый тикет."}
 
-  - id: ch03-task7
-    order: 7
+  - id: ch03-task8
+    order: 8
     phase: 2
     title: "Тикет-«невидимка»"
     description_md: |
       Клиент пишет: «Я создавал обращение **„SMS code not received“**, а в списке
       его нет! Вы его потеряли?»
 
-      **Как сделать** (заголовки `X-Student-Id` и `X-Task-Code: ch03-task7`):
+      **Как сделать** (заголовки `X-Student-Id` и `X-Task-Code: ch03-task8`):
       `GET {{BASE_URL}}/api/tickets`, во вкладке **Params** добавь `page` = `2`.
 
       **Что должно быть:** статус `200`, в `items` — тикет «SMS code not received».
@@ -254,22 +266,36 @@ tasks:
         - {path: body.page, equals: 2, hint: "Это не вторая страница. Добавь в Params параметр page = 2."}
         - {path: body.items, contains: {title: "SMS code not received"}, hint: "На этой странице тикета «SMS code not received» нет. Проверь limit: при limit=10 он на 2-й странице. Удалял тикеты из набора — верни его: POST {{BASE_URL}}/api/tickets/reset."}
 
-  - id: ch03-task8
-    order: 8
+  - id: ch03-task9
+    order: 9
     phase: 2
     title: "Слишком часто"
     description_md: |
       Учебный эндпоинт `{{BASE_URL}}/api/limited` разрешает 3 запроса за 10 секунд.
 
-      **Как сделать** (заголовки `X-Student-Id` и `X-Task-Code: ch03-task8`):
+      **Как сделать** (заголовки `X-Student-Id` и `X-Task-Code: ch03-task9`):
+      отправь `GET {{BASE_URL}}/api/limited` несколько раз подряд, пока не получишь
+      `429 Too Many Requests`.
 
-      1. Отправь `GET {{BASE_URL}}/api/limited` несколько раз подряд, пока не получишь
-         `429 Too Many Requests`.
-      2. Найди во вкладке **Headers** ответа заголовок `Retry-After` — через сколько
-         секунд можно повторить.
-      3. Подожди это время и отправь запрос ещё раз.
+      **Что должно быть:** статус `429`, во вкладке **Headers** ответа — заголовок
+      `Retry-After`: через сколько секунд можно повторить.
+    expected:
+      response:
+        - {path: status, equals: 429, hint: "Нужен ответ 429. Отправь GET {{BASE_URL}}/api/limited несколько раз подряд — больше 3 за 10 секунд."}
+        - {path: headers.retry-after, exists: true, hint: "В ответе 429 должен быть заголовок Retry-After."}
 
-      **Что должно быть:** сначала `429` с заголовком `Retry-After`, потом `200`.
+  - id: ch03-task10
+    order: 10
+    phase: 2
+    title: "Повторить после паузы"
+    description_md: |
+      Сервер ответил `429` в задании 9. Повтори запрос так, чтобы он прошёл.
+
+      **Как сделать** (заголовки `X-Student-Id` и `X-Task-Code: ch03-task10`):
+      подожди столько секунд, сколько было в `Retry-After`, и отправь
+      `GET {{BASE_URL}}/api/limited` один раз.
+
+      **Что должно быть:** статус `200`, в теле `ok: true`.
 
       **Сформулируй ответ клиенту**, который пишет «приложение выдаёт ошибку 429».
 
@@ -280,19 +306,15 @@ tasks:
       > защита сервера, данные не пострадали. Подождите несколько секунд и повторите.»
 
       </details>
-    # Два ответа по порядку: 429 (с Retry-After), потом 200 после паузы.
     expected:
-      ordered: true
-      steps:
-        - - {path: status, equals: 429, hint: "Сначала добейся 429: отправь GET {{BASE_URL}}/api/limited несколько раз подряд (больше 3 за 10 секунд)."}
-          - {path: headers.retry-after, exists: true, hint: "В ответе 429 должен быть заголовок Retry-After."}
-        - - {path: status, equals: 200, hint: "Подожди столько секунд, сколько написано в Retry-After, и отправь запрос ещё раз — нужен 200."}
-          - {path: body.ok, equals: true, hint: "Повтори запрос именно на {{BASE_URL}}/api/limited."}
+      response:
+        - {path: status, equals: 200, hint: "Нужен ответ 200. Пришёл 429 — ещё рано: подожди столько секунд, сколько написано в Retry-After, и отправь один запрос на {{BASE_URL}}/api/limited."}
+        - {path: body.ok, equals: true, hint: "Запрос ушёл не туда — нужен адрес {{BASE_URL}}/api/limited."}
 
-  - id: ch03-task9
-    order: 9
+  - id: ch03-task11
+    order: 11
     phase: 2
-    title: "Мини-тикет: 422"
+    title: "Мини-тикет: 422 — воспроизвести"
     description_md: |
       Разработчик интеграции пишет:
 
@@ -301,31 +323,46 @@ tasks:
       > `{"title": "Promo code does not work", "status": "in_progress"}`
       > и получаю `422`. Что не так?»
 
-      **Как сделать** (заголовки `X-Student-Id`, `X-Task-Code: ch03-task9`,
+      Воспроизведи ошибку.
+
+      **Как сделать** (заголовки `X-Student-Id`, `X-Task-Code: ch03-task11`,
       `Content-Type: application/json`):
 
       1. Найди `id` тикета «Promo code does not work» — он 10-й, последний на первой
          странице `GET {{BASE_URL}}/api/tickets`.
-      2. **Воспроизведи:** `PUT {{BASE_URL}}/api/tickets/<id>`, **Body** → **raw** →
-         **JSON**, тело ровно как у разработчика:
+      2. `PUT {{BASE_URL}}/api/tickets/<id>`, **Body** → **raw** → **JSON**, тело ровно
+         как у разработчика:
 
          ```json
          {"title": "Promo code does not work", "status": "in_progress"}
          ```
 
-         Сервер ответит `422`. Посмотри в теле ответа `details.missing` — какого поля
-         не хватает.
-      3. **Исправь:** добавь в тело это поле с прежним значением (`low`) и отправь
-         снова:
+      **Что должно быть:** `422`. Посмотри в теле ответа `details.missing` — какого
+      поля не хватает.
+    expected:
+      response:
+        - {path: status, equals: 422, hint: "Ожидается 422. Отправь PUT с телом ровно как у разработчика — без priority. Пришёл 200 — в теле есть priority, а у разработчика его не было; 404 — id не тот."}
+        - {path: body.details.missing, contains: priority, hint: "В 422 должно не хватать именно поля priority — отправь тело ровно как у разработчика."}
 
-         ```json
-         {"title": "Promo code does not work", "priority": "low", "status": "in_progress"}
-         ```
+  - id: ch03-task12
+    order: 12
+    phase: 2
+    title: "Мини-тикет: 422 — исправить"
+    description_md: |
+      Исправь запрос разработчика из задания 11, чтобы сервер его принял.
 
-      **Что должно быть:** сначала `422`, потом `200` — тикет в статусе
-      `in_progress`.
+      **Как сделать** (заголовки `X-Student-Id`, `X-Task-Code: ch03-task12`,
+      `Content-Type: application/json`): тот же `PUT {{BASE_URL}}/api/tickets/<id>`,
+      но добавь в тело недостающее поле из `details.missing` с прежним значением
+      (`low`):
 
-      **Посмотри на ответ `200`:** что стало с полем `description`?
+      ```json
+      {"title": "Promo code does not work", "priority": "low", "status": "in_progress"}
+      ```
+
+      **Что должно быть:** `200`, тикет в статусе `in_progress`.
+
+      **Посмотри на ответ:** что стало с полем `description`?
 
       <details markdown="1">
       <summary>Проверь себя</summary>
@@ -346,25 +383,21 @@ tasks:
       > статус, используйте `PATCH`: `PUT` без `description` сотрёт описание.»
 
       </details>
-    # Два ответа по порядку: сначала ошибка 422, потом успех.
     expected:
-      ordered: true
-      steps:
-        - - {path: status, equals: 422, hint: "Сначала воспроизведи ошибку: PUT с телом ровно как у разработчика (без priority). Сервер должен ответить 422."}
-          - {path: body.details.missing, contains: priority, hint: "В 422 должно не хватать именно поля priority — отправь тело ровно как у разработчика."}
-        - - {path: status, equals: 200, hint: "Добавь в тело недостающее поле (смотри details.missing в ответе 422) и отправь PUT снова."}
-          - {path: body.title, equals: "Promo code does not work", hint: "Это не тот тикет — нужен «Promo code does not work», а title в теле — без изменений."}
-          - {path: body.status, equals: in_progress, hint: "Тикет должен перейти в статус in_progress — оставь status в теле."}
+      response:
+        - {path: status, equals: 200, hint: "Сервер не ответил 200. Пришёл 422 — в теле не хватает поля из details.missing: добавь \"priority\": \"low\"."}
+        - {path: body.title, equals: "Promo code does not work", hint: "Это не тот тикет — нужен «Promo code does not work», а title в теле — без изменений."}
+        - {path: body.status, equals: in_progress, hint: "Тикет должен перейти в статус in_progress — оставь status в теле."}
 
-  - id: ch03-task10
-    order: 10
+  - id: ch03-task13
+    order: 13
     phase: 2
     title: "Мини-тикет: 503 и эскалация"
     description_md: |
       Клиент пишет: «Открываю раздел заказов — „Сервис временно недоступен“. Что с
       моим аккаунтом?» Воспроизведи ошибку и собери данные для эскалации.
 
-      **Как сделать** (заголовки `X-Student-Id` и `X-Task-Code: ch03-task10`):
+      **Как сделать** (заголовки `X-Student-Id` и `X-Task-Code: ch03-task13`):
 
       1. `GET {{BASE_URL}}/api/status/503` — учебный адрес, который всегда отвечает
          `503 Service Unavailable`.

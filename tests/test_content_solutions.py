@@ -10,7 +10,6 @@
 странице главы.
 """
 
-import asyncio
 import json
 import re
 import shutil
@@ -22,6 +21,7 @@ import pytest
 from httpx import AsyncClient, Response
 
 from app.i18n import SOURCE_LANG
+from app.services import limited
 from app.services.task_loader import TasksFile, load_task_files, load_task_translations
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -366,7 +366,10 @@ async def test_mistake_fails_with_english_hint(
 
 # ---------- Фаза 2: настоящий Postman ----------
 # url может содержать {id:<название>} — id тикета ученика с этим названием (ищется
-# перед запросом, как ученик ищет его в списке). {"sleep": N} — пауза (ожидание Retry-After).
+# перед запросом, как ученик ищет его в списке), {last_deleted} — id тикета, удалённого
+# предыдущим DELETE. {"reset_limit": True} — сбросить окно /api/limited вместо ожидания
+# Retry-After. "untracked": True — запрос без X-Task-Code: подготовка (например, DELETE перед
+# проверкой «удалён»), в историю задания не входит.
 
 NEW_TICKET = '{"title": "Test ticket", "priority": "medium"}'
 LOGIN = "{id:Cannot log in to my account}"
@@ -397,23 +400,23 @@ PHASE2_SOLUTIONS: dict[str, list[Req]] = {
     "ch03-task5": [
         {"method": "POST", "url": "/api/tickets", "headers": JSON_CT, "body": NEW_TICKET},
         {"method": "DELETE", "url": "/api/tickets/{id:Test ticket}"},
+    ],
+    "ch03-task6": [
+        {"method": "POST", "url": "/api/tickets", "headers": JSON_CT, "body": NEW_TICKET},
+        {"method": "DELETE", "url": "/api/tickets/{id:Test ticket}", "untracked": True},
         {"url": "/api/tickets/{last_deleted}"},
     ],
-    "ch03-task6": [patch(f"/api/tickets/{EMAIL}", '{"priority": "high"}')],
-    "ch03-task7": [{"url": "/api/tickets"}, {"url": "/api/tickets?page=2"}],
-    "ch03-task8": [
-        {"url": "/api/limited"},
-        {"url": "/api/limited"},
-        {"url": "/api/limited"},
-        {"url": "/api/limited"},
-        {"sleep": 1.1},
+    "ch03-task7": [patch(f"/api/tickets/{EMAIL}", '{"priority": "high"}')],
+    "ch03-task8": [{"url": "/api/tickets"}, {"url": "/api/tickets?page=2"}],
+    "ch03-task9": [{"url": "/api/limited"}] * 4,
+    "ch03-task10": [
+        *[{"url": "/api/limited", "untracked": True}] * 4,
+        {"reset_limit": True},
         {"url": "/api/limited"},
     ],
-    "ch03-task9": [
-        put(f"/api/tickets/{PROMO}", PROMO_PUT_BAD),
-        put(f"/api/tickets/{PROMO}", PROMO_PUT_OK),
-    ],
-    "ch03-task10": [{"url": "/api/status/503"}],
+    "ch03-task11": [put(f"/api/tickets/{PROMO}", PROMO_PUT_BAD)],
+    "ch03-task12": [put(f"/api/tickets/{PROMO}", PROMO_PUT_OK)],
+    "ch03-task13": [{"url": "/api/status/503"}],
 }
 
 PHASE2_MISTAKES: list[tuple[str, list[Req], str]] = [
@@ -446,25 +449,35 @@ PHASE2_MISTAKES: list[tuple[str, list[Req], str]] = [
         "PUT",
     ),
     ("ch03-task4", [patch(f"/api/tickets/{PROMO}", '{"status": "in_progress"}')], "не тот тикет"),
-    ("ch03-task5", [{"url": "/api/tickets/999999"}], "удали"),
-    ("ch03-task5", [{"method": "DELETE", "url": f"/api/tickets/{PROMO}"}], "GET"),
-    ("ch03-task6", [patch(f"/api/tickets/{PROMO}", '{"priority": "high"}')], "409"),
-    ("ch03-task7", [{"url": "/api/tickets"}], "page = 2"),
-    ("ch03-task7", [{"url": "/api/tickets?page=2&limit=20"}], "limit"),
-    ("ch03-task8", [{"url": "/api/limited"}, {"url": "/api/limited"}], "429"),
+    ("ch03-task5", [{"method": "DELETE", "url": "/api/tickets/999999"}], "?page=3"),
+    ("ch03-task5", [{"url": "/api/tickets/{id:Test ticket}"}], "DELETE"),
+    ("ch03-task6", [{"url": f"/api/tickets/{PROMO}"}], "id не тот"),
+    ("ch03-task6", [{"url": "/api/tickets"}], "задании 5"),
+    ("ch03-task7", [patch(f"/api/tickets/{PROMO}", '{"priority": "high"}')], "409"),
+    ("ch03-task8", [{"url": "/api/tickets"}], "page = 2"),
+    ("ch03-task8", [{"url": "/api/tickets?page=2&limit=20"}], "limit"),
+    ("ch03-task9", [{"url": "/api/limited"}, {"url": "/api/limited"}], "429"),
     (
-        "ch03-task8",
-        [{"url": "/api/limited"}] * 5,
+        "ch03-task10",
+        [*[{"url": "/api/limited", "untracked": True}] * 3, {"url": "/api/limited"}],
         "Retry-After",
     ),
-    ("ch03-task9", [put(f"/api/tickets/{PROMO}", PROMO_PUT_OK)], "воспроизведи"),
+    ("ch03-task10", [{"url": "/api/echo"}], "/api/limited"),
+    ("ch03-task11", [put(f"/api/tickets/{PROMO}", PROMO_PUT_OK)], "без priority"),
+    ("ch03-task11", [put("/api/tickets/999999", PROMO_PUT_BAD)], "id не тот"),
+    ("ch03-task12", [put(f"/api/tickets/{PROMO}", PROMO_PUT_BAD)], "details.missing"),
     (
-        "ch03-task9",
-        [put(f"/api/tickets/{PROMO}", PROMO_PUT_BAD), put(f"/api/tickets/{PROMO}", PROMO_PUT_BAD)],
-        "details.missing",
+        "ch03-task12",
+        [
+            put(
+                f"/api/tickets/{LOGIN}",
+                '{"title": "Cannot log in", "priority": "low", "status": "in_progress"}',
+            )
+        ],
+        "не тот тикет",
     ),
-    ("ch03-task10", [{"url": "/api/status/502"}], "503"),
-    ("ch03-task10", [{"url": "/api/echo"}], "503"),
+    ("ch03-task13", [{"url": "/api/status/502"}], "503"),
+    ("ch03-task13", [{"url": "/api/echo"}], "503"),
 ]
 
 _ID_RE = re.compile(r"\{id:([^}]+)\}")
@@ -510,8 +523,8 @@ async def run_phase2(
     code = await site_student_code(client)
     deleted: int | None = None
     for req in requests:
-        if "sleep" in req:
-            await asyncio.sleep(req["sleep"])
+        if req.get("reset_limit"):
+            limited.window.reset()
             continue
         url = req["url"]
         for title in _ID_RE.findall(url):
@@ -520,7 +533,7 @@ async def run_phase2(
         headers = dict(req.get("headers") or {})
         if student_header:
             headers["X-Student-Id"] = code
-        if task_header:
+        if task_header and not req.get("untracked"):
             headers["X-Task-Code"] = task_id
         method = req.get("method", "GET")
         await postman.request(method, url, headers=headers, content=req.get("body"))
@@ -530,17 +543,6 @@ async def run_phase2(
     return [entry_response(e) for e in items if e["task_code"] == task_id]
 
 
-@pytest.fixture
-def short_limit() -> Any:
-    """Окно /api/limited — 1 с вместо 10, чтобы не ждать Retry-After в тестах."""
-    from app.services import limited
-
-    old = limited.window.window
-    limited.window.window = 1.0
-    yield
-    limited.window.window = old
-
-
 def test_every_phase2_task_has_solution() -> None:
     assert set(PHASE2_SOLUTIONS) == set(PHASE2_TASKS)
 
@@ -548,7 +550,7 @@ def test_every_phase2_task_has_solution() -> None:
 @pytest.mark.parametrize("lang", [SOURCE_LANG, "en"])
 @pytest.mark.parametrize("task_id", sorted(PHASE2_SOLUTIONS))
 async def test_phase2_solution_passes(
-    client: AsyncClient, postman: AsyncClient, short_limit: Any, task_id: str, lang: str
+    client: AsyncClient, postman: AsyncClient, task_id: str, lang: str
 ) -> None:
     history = await run_phase2(client, postman, task_id, PHASE2_SOLUTIONS[task_id])
     result = evaluate(task_id, history, lang=lang)
@@ -558,7 +560,7 @@ async def test_phase2_solution_passes(
 @pytest.mark.parametrize("missing", ["student", "task"])
 @pytest.mark.parametrize("task_id", sorted(PHASE2_SOLUTIONS))
 async def test_phase2_needs_both_headers(
-    client: AsyncClient, postman: AsyncClient, short_limit: Any, task_id: str, missing: str
+    client: AsyncClient, postman: AsyncClient, task_id: str, missing: str
 ) -> None:
     """Эталон без одного из заголовков не засчитывается: в истории задания пусто."""
     history = await run_phase2(
@@ -577,7 +579,6 @@ async def test_phase2_needs_both_headers(
 async def test_phase2_mistake_fails_with_hint(
     client: AsyncClient,
     postman: AsyncClient,
-    short_limit: Any,
     task_id: str,
     requests: list[Req],
     hint_part: str,
