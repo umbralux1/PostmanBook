@@ -9,6 +9,20 @@ document.addEventListener("alpine:init", function () {
   var ADVANCE_DELAY_MS = 2000;
   var advanceTimer = null;
 
+  // Фаза 2: сервер должен знать выбранное задание — ему засчитываются следующие
+  // запросы ученика из Postman (заголовка с кодом задания нет).
+  var serverTask = null;
+  function tellServer(id) {
+    if (!personal || !id || id === serverTask) return;
+    serverTask = id;
+    fetch("/api/journal/task", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ task_id: id }),
+      credentials: "same-origin",
+    }).catch(function () { serverTask = null; });
+  }
+
   Alpine.store("task", {
     id: null,
     title: "",
@@ -20,6 +34,7 @@ document.addEventListener("alpine:init", function () {
       this.id = id;
       this.title = title;
       this.expected = expected;
+      tellServer(id);
       if (!fromRemote && !personal && window.Collab) window.Collab.local("taskId", id);
       window.dispatchEvent(new CustomEvent("task-selected", { detail: { id: id } }));
       if (opts && opts.reveal) {
@@ -42,9 +57,12 @@ document.addEventListener("alpine:init", function () {
     // Задание засчитано → через паузу следующее невыполненное по порядку.
     // Вызывает только тот, кто засчитал: в фазе 1 выбор разойдётся по комнате как taskId.
     // Если за паузу выбрали другое задание, переход отменяется (select сбрасывает таймер).
+    // Фаза 2: сервер переключается на следующее задание сразу, а карточка — после паузы,
+    // иначе запрос, отправленный в эти 2 с, засчитался бы уже выполненному заданию.
     advanceFrom: function (id) {
       var self = this;
       clearTimeout(advanceTimer);
+      tellServer(window.TaskOrder.nextAfter(window.TASK_ORDER || [], self.passed, id));
       advanceTimer = setTimeout(function () {
         if (self.id !== id) return;
         var next = window.TaskOrder.nextAfter(window.TASK_ORDER || [], self.passed, id);

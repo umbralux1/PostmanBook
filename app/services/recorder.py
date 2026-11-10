@@ -4,14 +4,16 @@
 в `ReceivedRequest` вместе с ответом сервера (статус, заголовки, тело) — это делает
 middleware в `app/main.py`. Новые записи рассылаются в личный SSE-канал ученика.
 
-Задание проверяет фронт: тем же `static/js/checker.js`, что и в фазе 1, по ответам
-на запросы с `X-Task-Code` = id задания. Здесь задание не засчитывается.
+Запрос относится к заданию, которое ученик сейчас выбрал на странице главы
+(`User.phase2_task`, ставит `PUT /api/journal/task`): заголовок с кодом задания не
+нужен. Задание проверяет фронт: тем же `static/js/checker.js`, что и в фазе 1, по
+ответам на запросы этого задания. Здесь задание не засчитывается.
 Для заданий фазы 2 с `expected.request` запрос дополнительно сравнивается с
 эталоном (`validator.py`) — это только подсказки «что не так в запросе».
 
 Запрос без `X-Student-Id` (или с неизвестным кодом) не записывается: неизвестно,
-чей он. Запрос без `X-Task-Code` записывается с пустым `task_code` — в журнале
-ученик видит подсказку, что заголовка не хватает.
+чей он. Если задание не выбрано, запрос записывается с пустым `task_code` — в журнале
+ученик видит подсказку открыть задание на странице главы.
 """
 
 import logging
@@ -31,6 +33,8 @@ from app.services.validator import validate
 
 log = logging.getLogger("trainer.recorder")
 
+# Заголовок кода задания отправляет только мини-Postman (фаза 1, echo его показывает).
+# В фазе 2 задание берётся из выбора на странице (User.phase2_task).
 TASK_HEADER = "x-task-code"
 MAX_TASK_CODE_LEN = 64
 # Служебные пути сайта: в журнал ученика не попадают. Остальное под /api/ — учебный
@@ -90,9 +94,10 @@ def store(
 ) -> ReceivedRequest | None:
     """Записать запрос с ответом и разослать событие в канал ученика."""
     with Session(get_engine()) as session:
-        if session.exec(select(User.id).where(User.student_code == student_code)).first() is None:
+        user = session.exec(select(User).where(User.student_code == student_code)).first()
+        if user is None:
             return None
-        code = task_code_of(snapshot) or ""
+        code = user.phase2_task or ""
         task = session.get(Task, code) if code else None
         validation: dict[str, Any] = {}
         request_expected = (task.expected or {}).get("request") if task else None

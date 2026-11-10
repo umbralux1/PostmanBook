@@ -1,6 +1,6 @@
 {# Фаза 2: панель «Твой Postman» — только для чтения, мини-Postman здесь нет.
-   Запросы ученик отправляет из настоящего Postman; панель показывает заголовки для
-   текущего задания, журнал запросов, которые получил сервер, и результат проверки
+   Запросы ученик отправляет из настоящего Postman; панель показывает личный код
+   (X-Student-Id), выбранное задание, журнал запросов, которые получил сервер, и результат проверки
    (тот же checker.js, что в фазе 1). Логика — static/js/phase2.js.
    DOM одинаковый у всех участников комнаты: личное — через x-text / x-show, не x-if. #}
 <div x-data="postmanPanel" class="pm">
@@ -10,28 +10,21 @@
           x-text="connection === 'live' ? t('журнал обновляется сам') : connection === 'lost' ? t('Соединение прервано, обнови страницу.') : t('подключаюсь…')"></span>
   </div>
   <div class="px-[14px] pt-2 pb-3">
-    <p class="pm-section-title">{{ _("Здесь нельзя отправить запрос — только посмотреть, что получил сервер. Отправляй запросы из настоящего Postman и добавь в Headers два заголовка:") }}</p>
+    <p class="pm-section-title">{{ _("Здесь нельзя отправить запрос — только посмотреть, что получил сервер. Отправляй запросы из настоящего Postman и добавь в Headers заголовок:") }}</p>
 
     <div class="rounded border border-[#e6e6e6]">
-      <div class="flex items-center gap-2 border-b border-[#e6e6e6] px-2 py-1.5">
+      <div class="flex items-center gap-2 px-2 py-1.5">
         <code class="w-28 shrink-0 font-semibold">X-Student-Id</code>
         <code class="flex-1 truncate" x-text="studentCode"></code>
         <button type="button" class="rounded px-2 py-0.5 text-xs font-medium text-white bg-[#097bed] hover:bg-[#0265d2]"
                 @click="copy(studentCode, 'student')"
                 x-text="copied === 'student' ? t('Скопировано') : t('Скопировать')"></button>
       </div>
-      <div class="flex items-center gap-2 px-2 py-1.5">
-        <code class="w-28 shrink-0 font-semibold">X-Task-Code</code>
-        <code class="flex-1 truncate" x-text="$store.task.id || '—'"></code>
-        <button type="button" class="rounded px-2 py-0.5 text-xs font-medium text-white bg-[#097bed] hover:bg-[#0265d2] disabled:opacity-40"
-                :disabled="!$store.task.id"
-                @click="copy($store.task.id, 'task')"
-                x-text="copied === 'task' ? t('Скопировано') : t('Скопировать')"></button>
-      </div>
     </div>
     <p class="pm-note">
-      <span x-show="$store.task.id">{{ _("X-Student-Id — твой личный код, он один для всех заданий. X-Task-Code — код выбранного задания, меняй его вместе с заданием.") }}</span>
-      <span x-show="!$store.task.id">{{ _("Выбери задание слева — здесь появится его X-Task-Code.") }}</span>
+      {{ _("X-Student-Id — твой личный код, он один для всех заданий.") }}
+      <span x-show="$store.task.id">{{ _("Запросы засчитываются заданию, выбранному на странице:") }} <b x-text="$store.task.title"></b>.</span>
+      <span x-show="!$store.task.id">{{ _("Выбери задание слева — запросы будут засчитываться ему.") }}</span>
     </p>
     <p class="pm-note">{{ _("Адрес учебного API:") }} <code x-text="baseUrl + '/api/…'"></code></p>
   </div>
@@ -94,7 +87,7 @@
             </button>
             <div class="px-2 pb-1 pl-[26px] text-xs" x-show="e.task_code || entryNote(e)">
               <span x-show="e.known_task" style="color: var(--pm-text-2)"
-                    x-text="'X-Task-Code: ' + e.task_code + (taskTitle(e.task_code) ? ' — ' + taskTitle(e.task_code) : '')"></span>
+                    x-text="t('Задание:') + ' ' + taskTitle(e.task_code)"></span>
               <span x-show="entryNote(e)" style="color: var(--pm-orange)" x-text="entryNote(e)"></span>
               <template x-for="h in (e.hints || [])" :key="h">
                 <span class="block" style="color: var(--pm-orange)" x-text="h"></span>

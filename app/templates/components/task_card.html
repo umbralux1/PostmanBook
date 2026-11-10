@@ -24,7 +24,7 @@
   <div x-show="open" x-cloak class="prose-trainer mt-3 border-t border-slate-100 pt-3 text-sm">
     {{ task.description_md | md }}
     {% if task.phase == 2 %}
-      <p class="text-xs text-slate-500">{{ _("Заголовки запроса из Postman:") }} <code>X-Student-Id</code> {{ _("(личный код) и") }} <code>X-Task-Code: {{ task.id }}</code>.</p>
+      <p class="text-xs text-slate-500">{{ _("Запросы из Postman с заголовком X-Student-Id засчитываются этому заданию, пока оно выбрано (кнопка «Решаю»).") }}</p>
       {% if kind == 'ordered' %}
       <p class="text-xs text-slate-500">{{ _("Нужно несколько ответов сервера по порядку — как в «Что должно быть».") }}</p>
       {% endif %}

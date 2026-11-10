@@ -1,5 +1,6 @@
 chapter_id: ch03
-# Фаза 2: запросы — из настоящего Postman с заголовками X-Student-Id и X-Task-Code.
+# Фаза 2: запросы — из настоящего Postman с заголовком X-Student-Id; задание — то, что
+# выбрано на странице главы (заголовка с кодом задания нет).
 # Проверка — тем же checker.js по ответам из журнала ученика (expected как в фазе 1).
 # expected.request — эталон запроса для подсказок в журнале (validator.py), не для зачёта.
 # Тикеты учебного набора (services/ticket_seed.py) — на английском, одни для RU/EN.
@@ -15,10 +16,8 @@ tasks:
 
       1. В Postman нажми **+** (новая вкладка запроса). Метод `GET`, адрес
          `{{BASE_URL}}/api/echo`.
-      2. Вкладка **Headers** → добавь две строки (значения — в панели «Твой Postman»
-         справа, кнопка «Скопировать»):
-          - Key `X-Student-Id`, Value — твой личный код;
-          - Key `X-Task-Code`, Value `ch03-task1`.
+      2. Вкладка **Headers** → добавь строку: Key `X-Student-Id`, Value — твой личный
+         код (он в панели «Твой Postman» справа, кнопка «Скопировать»).
       3. Нажми **Send**.
 
       **Что должно быть:**
@@ -42,8 +41,7 @@ tasks:
       Посмотри, какие тикеты у тебя есть. У каждого ученика свой учебный набор —
       он создаётся при первом запросе с твоим `X-Student-Id`.
 
-      **Как сделать:** `GET {{BASE_URL}}/api/tickets` с заголовками `X-Student-Id`
-      и `X-Task-Code: ch03-task2`.
+      **Как сделать:** `GET {{BASE_URL}}/api/tickets` с заголовком `X-Student-Id`.
 
       **Что должно быть:**
       - статус `200`;
@@ -78,8 +76,7 @@ tasks:
       **Как сделать:**
 
       1. Метод `POST`, адрес `{{BASE_URL}}/api/tickets`.
-      2. **Headers:** `X-Student-Id`, `X-Task-Code: ch03-task3` и
-         `Content-Type: application/json`.
+      2. **Headers:** `X-Student-Id` и `Content-Type: application/json`.
       3. **Body** → **raw** → справа выбери **JSON** и вставь:
 
          ```json
@@ -127,7 +124,7 @@ tasks:
 
       1. Найди `id` тикета: `GET {{BASE_URL}}/api/tickets` (он первый в списке).
       2. Отправь `PATCH {{BASE_URL}}/api/tickets/<id>` с заголовками
-         `X-Student-Id`, `X-Task-Code: ch03-task4`, `Content-Type: application/json`
+         `X-Student-Id` и `Content-Type: application/json`
          и телом `{"status": "in_progress"}`.
 
       **Что должно быть:**
@@ -160,7 +157,7 @@ tasks:
     description_md: |
       Удали тикет «Test ticket», созданный в задании 3.
 
-      **Как сделать** (заголовки `X-Student-Id` и `X-Task-Code: ch03-task5`):
+      **Как сделать** (заголовок `X-Student-Id`):
       `DELETE {{BASE_URL}}/api/tickets/<id>` — `id` тикета из задания 3 (забыл — найди
       его в конце списка, на последней странице: `?page=3`).
 
@@ -179,7 +176,7 @@ tasks:
     description_md: |
       Убедись, что тикет, удалённый в задании 5, действительно пропал.
 
-      **Как сделать** (заголовки `X-Student-Id` и `X-Task-Code: ch03-task6`):
+      **Как сделать** (заголовок `X-Student-Id`):
       `GET {{BASE_URL}}/api/tickets/<id>` — тот же адрес, что в задании 5, только метод
       `GET`.
 
@@ -212,7 +209,7 @@ tasks:
 
       1. Найди `id` тикета «How do I change my email?» в списке.
       2. `PATCH {{BASE_URL}}/api/tickets/<id>` с заголовками `X-Student-Id`,
-         `X-Task-Code: ch03-task7`, `Content-Type: application/json` и телом
+         `Content-Type: application/json` и телом
          `{"priority": "high"}`.
 
       **Что должно быть:** `409 Conflict`, в теле `error: "ticket_closed"`.
@@ -242,7 +239,7 @@ tasks:
       Клиент пишет: «Я создавал обращение **„SMS code not received“**, а в списке
       его нет! Вы его потеряли?»
 
-      **Как сделать** (заголовки `X-Student-Id` и `X-Task-Code: ch03-task8`):
+      **Как сделать** (заголовок `X-Student-Id`):
       `GET {{BASE_URL}}/api/tickets`, во вкладке **Params** добавь `page` = `2`.
 
       **Что должно быть:** статус `200`, в `items` — тикет «SMS code not received».
@@ -273,7 +270,7 @@ tasks:
     description_md: |
       Учебный эндпоинт `{{BASE_URL}}/api/limited` разрешает 3 запроса за 10 секунд.
 
-      **Как сделать** (заголовки `X-Student-Id` и `X-Task-Code: ch03-task9`):
+      **Как сделать** (заголовок `X-Student-Id`):
       отправь `GET {{BASE_URL}}/api/limited` несколько раз подряд, пока не получишь
       `429 Too Many Requests`.
 
@@ -291,7 +288,7 @@ tasks:
     description_md: |
       Сервер ответил `429` в задании 9. Повтори запрос так, чтобы он прошёл.
 
-      **Как сделать** (заголовки `X-Student-Id` и `X-Task-Code: ch03-task10`):
+      **Как сделать** (заголовок `X-Student-Id`):
       подожди столько секунд, сколько было в `Retry-After`, и отправь
       `GET {{BASE_URL}}/api/limited` один раз.
 
@@ -325,7 +322,7 @@ tasks:
 
       Воспроизведи ошибку.
 
-      **Как сделать** (заголовки `X-Student-Id`, `X-Task-Code: ch03-task11`,
+      **Как сделать** (заголовки `X-Student-Id` и
       `Content-Type: application/json`):
 
       1. Найди `id` тикета «Promo code does not work» — он 10-й, последний на первой
@@ -351,7 +348,7 @@ tasks:
     description_md: |
       Исправь запрос разработчика из задания 11, чтобы сервер его принял.
 
-      **Как сделать** (заголовки `X-Student-Id`, `X-Task-Code: ch03-task12`,
+      **Как сделать** (заголовки `X-Student-Id` и
       `Content-Type: application/json`): тот же `PUT {{BASE_URL}}/api/tickets/<id>`,
       но добавь в тело недостающее поле из `details.missing` с прежним значением
       (`low`):
@@ -397,7 +394,7 @@ tasks:
       Клиент пишет: «Открываю раздел заказов — „Сервис временно недоступен“. Что с
       моим аккаунтом?» Воспроизведи ошибку и собери данные для эскалации.
 
-      **Как сделать** (заголовки `X-Student-Id` и `X-Task-Code: ch03-task13`):
+      **Как сделать** (заголовок `X-Student-Id`):
 
       1. `GET {{BASE_URL}}/api/status/503` — учебный адрес, который всегда отвечает
          `503 Service Unavailable`.

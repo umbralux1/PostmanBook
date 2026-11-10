@@ -19,10 +19,14 @@ from typing import Any
 
 import pytest
 from httpx import AsyncClient, Response
+from sqlmodel import Session, select
 
+from app.db import get_engine
 from app.i18n import SOURCE_LANG
+from app.models import Ticket, User
 from app.services import limited
 from app.services.task_loader import TasksFile, load_task_files, load_task_translations
+from app.services.ticket_seed import ensure_seeded
 
 ROOT = Path(__file__).resolve().parents[1]
 RUNNER = ROOT / "tests/js/evaluate.cjs"
@@ -368,8 +372,9 @@ async def test_mistake_fails_with_english_hint(
 # url может содержать {id:<название>} — id тикета ученика с этим названием (ищется
 # перед запросом, как ученик ищет его в списке), {last_deleted} — id тикета, удалённого
 # предыдущим DELETE. {"reset_limit": True} — сбросить окно /api/limited вместо ожидания
-# Retry-After. "untracked": True — запрос без X-Task-Code: подготовка (например, DELETE перед
-# проверкой «удалён»), в историю задания не входит.
+# Retry-After. "untracked": True — подготовка (например, DELETE перед проверкой «удалён»):
+# отправляется до выбора задания на странице, в историю задания не входит. Такие запросы
+# идут первыми.
 
 NEW_TICKET = '{"title": "Test ticket", "priority": "medium"}'
 LOGIN = "{id:Cannot log in to my account}"
@@ -402,7 +407,13 @@ PHASE2_SOLUTIONS: dict[str, list[Req]] = {
         {"method": "DELETE", "url": "/api/tickets/{id:Test ticket}"},
     ],
     "ch03-task6": [
-        {"method": "POST", "url": "/api/tickets", "headers": JSON_CT, "body": NEW_TICKET},
+        {
+            "method": "POST",
+            "url": "/api/tickets",
+            "headers": JSON_CT,
+            "body": NEW_TICKET,
+            "untracked": True,
+        },
         {"method": "DELETE", "url": "/api/tickets/{id:Test ticket}", "untracked": True},
         {"url": "/api/tickets/{last_deleted}"},
     ],
@@ -489,12 +500,16 @@ async def site_student_code(client: AsyncClient) -> str:
 
 
 async def ticket_id(postman: AsyncClient, code: str, title: str) -> int:
-    """Id тикета ученика по названию (запрос без X-Task-Code — в историю задания не входит)."""
-    r = await postman.get("/api/tickets?limit=100", headers={"X-Student-Id": code})
-    for t in r.json()["items"]:
-        if t["title"] == title:
-            return int(t["id"])
-    return 999_999
+    """Id тикета ученика по названию — прямо из базы: запрос в учебный API попал бы в
+    историю выбранного задания (задание теперь выбирается на странице, не заголовком).
+    """
+    with Session(get_engine()) as s:
+        user = s.exec(select(User).where(User.student_code == code)).one()
+        ensure_seeded(s, user)
+        found = s.exec(
+            select(Ticket.id).where(Ticket.owner == code).where(Ticket.title == title)
+        ).first()
+    return int(found) if found is not None else 999_999
 
 
 def entry_response(entry: dict[str, Any]) -> dict[str, Any]:
@@ -517,12 +532,22 @@ async def run_phase2(
     requests: list[Req],
     *,
     student_header: bool = True,
-    task_header: bool = True,
+    select_task: bool = True,
 ) -> list[dict[str, Any]]:
-    """Отправить запросы «из Postman» и вернуть историю задания из журнала ученика."""
+    """Отправить запросы «из Postman» и вернуть историю задания из журнала ученика.
+
+    Задание выбирается на странице (PUT /api/journal/task) перед первым запросом,
+    который не помечен "untracked".
+    """
     code = await site_student_code(client)
     deleted: int | None = None
+    selected = False
     for req in requests:
+        if select_task and not selected and not req.get("untracked"):
+            r = await client.put("/api/journal/task", json={"task_id": task_id})
+            assert r.status_code == 200, r.text
+            selected = True
+        assert not (selected and req.get("untracked")), "untracked — только до выбора задания"
         if req.get("reset_limit"):
             limited.window.reset()
             continue
@@ -533,8 +558,6 @@ async def run_phase2(
         headers = dict(req.get("headers") or {})
         if student_header:
             headers["X-Student-Id"] = code
-        if task_header and not req.get("untracked"):
-            headers["X-Task-Code"] = task_id
         method = req.get("method", "GET")
         await postman.request(method, url, headers=headers, content=req.get("body"))
         if method == "DELETE":
@@ -559,17 +582,17 @@ async def test_phase2_solution_passes(
 
 @pytest.mark.parametrize("missing", ["student", "task"])
 @pytest.mark.parametrize("task_id", sorted(PHASE2_SOLUTIONS))
-async def test_phase2_needs_both_headers(
+async def test_phase2_needs_student_and_selected_task(
     client: AsyncClient, postman: AsyncClient, task_id: str, missing: str
 ) -> None:
-    """Эталон без одного из заголовков не засчитывается: в истории задания пусто."""
+    """Эталон без X-Student-Id или без выбранного на странице задания не засчитывается."""
     history = await run_phase2(
         client,
         postman,
         task_id,
         PHASE2_SOLUTIONS[task_id],
         student_header=missing != "student",
-        task_header=missing != "task",
+        select_task=missing != "task",
     )
     assert history == []
     assert evaluate(task_id, history)["passed"] is False

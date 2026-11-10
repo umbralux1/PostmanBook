@@ -36,3 +36,6 @@ class User(SQLModel, table=True):
     tickets_seeded: bool = False
     # Глава 4: хеш учебного пароля после смены; None — пароль по умолчанию (support123).
     auth_password_hash: str | None = Field(default=None, max_length=64)
+    # Фаза 2: задание, выбранное на странице главы. Запросы ученика из Postman
+    # (X-Student-Id) засчитываются в журнале этому заданию.
+    phase2_task: str | None = Field(default=None, max_length=64)

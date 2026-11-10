@@ -23,13 +23,14 @@ async def student_code(client: AsyncClient) -> str:
     return code
 
 
-def headers(code: str | None = None, task: str | None = None) -> dict[str, str]:
-    h = {}
-    if code:
-        h["X-Student-Id"] = code
-    if task:
-        h["X-Task-Code"] = task
-    return h
+def headers(code: str | None = None) -> dict[str, str]:
+    return {"X-Student-Id": code} if code else {}
+
+
+async def select_task(client: AsyncClient, task_id: str) -> None:
+    """Выбрать задание на странице главы (как task_store.js)."""
+    r = await client.put("/api/journal/task", json={"task_id": task_id})
+    assert r.status_code == 200, r.text
 
 
 def add_phase2_task(session: Session, request: dict[str, Any] | None = None) -> None:
@@ -53,11 +54,12 @@ def add_phase2_task(session: Session, request: dict[str, Any] | None = None) -> 
     session.commit()
 
 
-async def test_request_with_both_headers_is_stored_with_response(
+async def test_request_is_stored_with_response_and_selected_task(
     client: AsyncClient, postman: AsyncClient, session: Session
 ) -> None:
     code = await student_code(client)
-    r = await postman.post("/api/tickets", json=BODY, headers=headers(code, "ch03-task3"))
+    await select_task(client, "ch03-task3")
+    r = await postman.post("/api/tickets", json=BODY, headers=headers(code))
     assert r.status_code == 201  # тело дошло до эндпоинта, хотя middleware его прочитал
     rr = session.exec(select(ReceivedRequest)).one()
     assert rr.student_code == code and rr.task_code == "ch03-task3"
@@ -75,7 +77,7 @@ async def test_error_responses_are_stored_too(
 ) -> None:
     code = await student_code(client)
     for _ in range(4):
-        r = await postman.get("/api/limited", headers=headers(code, "ch03-task8"))
+        r = await postman.get("/api/limited", headers=headers(code))
     assert r.status_code == 429
     last = session.exec(select(ReceivedRequest).where(ReceivedRequest.response_status == 429)).one()
     assert int(last.response_headers["retry-after"]) >= 1
@@ -86,8 +88,8 @@ async def test_error_responses_are_stored_too(
     "hdrs",
     [
         {"X-Task-Code": "ch03-task1"},  # нет X-Student-Id — неизвестно, чей запрос
-        {"X-Student-Id": "ZZZZZZ", "X-Task-Code": "ch03-task1"},  # неизвестный код
-        {"X-Student-Id": "bad", "X-Task-Code": "ch03-task1"},  # не тот формат
+        {"X-Student-Id": "ZZZZZZ"},  # неизвестный код
+        {"X-Student-Id": "bad"},  # не тот формат
         {},
     ],
 )
@@ -100,7 +102,7 @@ async def test_requests_without_known_student_are_not_stored(
     assert session.exec(select(ReceivedRequest)).all() == []
 
 
-async def test_request_without_task_code_is_logged_with_empty_code(
+async def test_request_without_selected_task_is_logged_with_empty_code(
     client: AsyncClient, postman: AsyncClient
 ) -> None:
     code = await student_code(client)
@@ -115,8 +117,8 @@ async def test_service_endpoints_are_not_logged(
     client: AsyncClient, postman: AsyncClient, session: Session
 ) -> None:
     code = await student_code(client)
-    await postman.get("/api/progress", headers=headers(code, "ch03-task1"))
-    await postman.get("/healthz", headers=headers(code, "ch03-task1"))
+    await postman.get("/api/progress", headers=headers(code))
+    await postman.get("/healthz", headers=headers(code))
     assert session.exec(select(ReceivedRequest)).all() == []
 
 
@@ -130,8 +132,8 @@ async def test_journal_is_personal(
         cookies={SESSION_COOKIE: "test-session-token-0002"},
     ) as other:
         theirs = await student_code(other)
-        await postman.get("/api/echo?who=me", headers=headers(mine, "ch03-task1"))
-        await postman.get("/api/echo?who=other", headers=headers(theirs, "ch03-task1"))
+        await postman.get("/api/echo?who=me", headers=headers(mine))
+        await postman.get("/api/echo?who=other", headers=headers(theirs))
         got = (await client.get("/api/journal")).json()
         assert got["student_code"] == mine
         assert [e["query"] for e in got["items"]] == [{"who": "me"}]
@@ -144,14 +146,37 @@ async def test_journal_entry_shape(
 ) -> None:
     add_phase2_task(session)
     code = await student_code(client)
-    await postman.get("/api/status/409", headers=headers(code, "ch98-task1"))
-    await postman.get("/api/echo", headers=headers(code, "nope-1"))
+    await select_task(client, "ch98-task1")
+    await postman.get("/api/status/409", headers=headers(code))
+    # Заголовок X-Task-Code в фазе 2 ни на что не влияет: задание — выбранное на странице.
+    await postman.get("/api/echo", headers={**headers(code), "X-Task-Code": "nope-1"})
     first, second = (await client.get("/api/journal")).json()["items"]  # старые → новые
     assert first["task_code"] == "ch98-task1" and first["known_task"] is True
     assert first["method"] == "GET" and first["path"] == "/api/status/409"
     assert first["response"]["status"] == 409
     assert json.loads(first["response"]["body"]) == {"status": 409}
-    assert second["known_task"] is False and second["task_code"] == "nope-1"
+    assert second["known_task"] is True and second["task_code"] == "ch98-task1"
+
+
+async def test_selected_task_switches_next_requests(
+    client: AsyncClient, postman: AsyncClient
+) -> None:
+    code = await student_code(client)
+    await select_task(client, "ch03-task1")
+    await postman.get("/api/echo", headers=headers(code))
+    await select_task(client, "ch03-task2")
+    await postman.get("/api/tickets", headers=headers(code))
+    items = (await client.get("/api/journal")).json()["items"]
+    assert [e["task_code"] for e in items] == ["ch03-task1", "ch03-task2"]
+
+
+async def test_select_task_validation(client: AsyncClient) -> None:
+    r = await client.put("/api/journal/task", json={"task_id": "nope"})
+    assert r.status_code == 404
+    r = await client.put("/api/journal/task", json={"task_id": "ch01-task1"})
+    assert r.status_code == 400 and r.json()["error"] == "wrong_phase"
+    r = await client.put("/api/journal/task", json={"task_id": "ch03-task1"})
+    assert r.status_code == 200 and r.json() == {"task_id": "ch03-task1"}
 
 
 async def test_validator_hints_in_user_language(
@@ -159,7 +184,8 @@ async def test_validator_hints_in_user_language(
 ) -> None:
     add_phase2_task(session, request={"method": "POST", "path": "/api/echo"})
     code = await student_code(client)
-    await postman.get("/api/echo", headers=headers(code, "ch98-task1"))
+    await select_task(client, "ch98-task1")
+    await postman.get("/api/echo", headers=headers(code))
     rr = session.exec(select(ReceivedRequest)).one()
     assert rr.validated is True and rr.validation_result["passed"] is False
 
@@ -175,7 +201,7 @@ async def test_journal_without_site_cookie_is_empty(
     client: AsyncClient, postman: AsyncClient
 ) -> None:
     code = await student_code(client)
-    await postman.get("/api/echo", headers=headers(code, "ch03-task1"))
+    await postman.get("/api/echo", headers=headers(code))
     # Код ученика в URL или заголовке не принимается — только cookie сайта.
     r = await postman.get("/api/journal", headers=headers(code))
     assert r.status_code == 200 and r.json()["items"] == []
@@ -247,6 +273,7 @@ def test_journal_stream_is_live_and_personal(live: LiveServer) -> None:  # noqa:
     other = httpx.Client(base_url=live.base, cookies={SESSION_COOKIE: "live-sse-token-0002"})
     pm = httpx.Client(base_url=live.base)
     my_code = me.get("/api/room").json()["me"]["student_code"]
+    assert me.put("/api/journal/task", json={"task_id": "ch03-task1"}).status_code == 200
     other_code = other.get("/api/room").json()["me"]["student_code"]
     events: list[dict[str, Any]] = []
     connected = threading.Event()
@@ -263,8 +290,8 @@ def test_journal_stream_is_live_and_personal(live: LiveServer) -> None:  # noqa:
     t = threading.Thread(target=listen, daemon=True)
     t.start()
     assert connected.wait(5)
-    pm.get("/api/echo?who=other", headers=headers(other_code, "ch03-task1"))
-    pm.get("/api/echo?who=me", headers=headers(my_code, "ch03-task1"))
+    pm.get("/api/echo?who=other", headers=headers(other_code))
+    pm.get("/api/echo?who=me", headers=headers(my_code))
     t.join(5)
     assert len(events) == 1
     assert events[0]["query"] == {"who": "me"}
@@ -287,6 +314,6 @@ async def test_phase2_chapter_page_has_no_mini_postman(client: AsyncClient) -> N
 async def test_typo_in_api_path_is_logged(client: AsyncClient, postman: AsyncClient) -> None:
     """Опечатка в адресе учебного API тоже в журнале — ученик видит свой 404."""
     code = await student_code(client)
-    await postman.get("/api/ech0", headers=headers(code, "ch03-task1"))
+    await postman.get("/api/ech0", headers=headers(code))
     items = (await client.get("/api/journal")).json()["items"]
     assert [(e["path"], e["response"]["status"]) for e in items] == [("/api/ech0", 404)]

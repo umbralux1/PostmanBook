@@ -11,10 +11,8 @@ tasks:
 
       1. In Postman click **+** (a new request tab). Method `GET`, address
          `{{BASE_URL}}/api/echo`.
-      2. The **Headers** tab → add two rows (the values are in the “Your Postman” panel
-         on the right, the “Copy” button):
-          - Key `X-Student-Id`, Value — your personal code;
-          - Key `X-Task-Code`, Value `ch03-task1`.
+      2. The **Headers** tab → add a row: Key `X-Student-Id`, Value — your personal code
+         (it's in the “Your Postman” panel on the right, the “Copy” button).
       3. Click **Send**.
 
       **What you should get:**
@@ -38,8 +36,7 @@ tasks:
       See which tickets you have. Every student has their own practice set — it's created
       on the first request with your `X-Student-Id`.
 
-      **How to do it:** `GET {{BASE_URL}}/api/tickets` with the `X-Student-Id` and
-      `X-Task-Code: ch03-task2` headers.
+      **How to do it:** `GET {{BASE_URL}}/api/tickets` with the `X-Student-Id` header.
 
       **What you should get:**
       - status `200`;
@@ -74,8 +71,7 @@ tasks:
       **How to do it:**
 
       1. Method `POST`, address `{{BASE_URL}}/api/tickets`.
-      2. **Headers:** `X-Student-Id`, `X-Task-Code: ch03-task3` and
-         `Content-Type: application/json`.
+      2. **Headers:** `X-Student-Id` and `Content-Type: application/json`.
       3. **Body** → **raw** → pick **JSON** on the right and paste:
 
          ```json
@@ -122,8 +118,8 @@ tasks:
       **How to do it:**
 
       1. Find the ticket's `id`: `GET {{BASE_URL}}/api/tickets` (it's first in the list).
-      2. Send `PATCH {{BASE_URL}}/api/tickets/<id>` with the `X-Student-Id`,
-         `X-Task-Code: ch03-task4` and `Content-Type: application/json` headers and the
+      2. Send `PATCH {{BASE_URL}}/api/tickets/<id>` with the `X-Student-Id` and
+         `Content-Type: application/json` headers and the
          body `{"status": "in_progress"}`.
 
       **What you should get:**
@@ -156,7 +152,7 @@ tasks:
     description_md: |
       Delete the “Test ticket” created in task 3.
 
-      **How to do it** (headers `X-Student-Id` and `X-Task-Code: ch03-task5`):
+      **How to do it** (the `X-Student-Id` header):
       `DELETE {{BASE_URL}}/api/tickets/<id>` — the `id` of the ticket from task 3
       (forgot it? find it at the end of the list, on the last page: `?page=3`).
 
@@ -175,7 +171,7 @@ tasks:
     description_md: |
       Make sure the ticket deleted in task 5 is really gone.
 
-      **How to do it** (headers `X-Student-Id` and `X-Task-Code: ch03-task6`):
+      **How to do it** (the `X-Student-Id` header):
       `GET {{BASE_URL}}/api/tickets/<id>` — the same address as in task 5, just with the
       `GET` method.
 
@@ -207,8 +203,8 @@ tasks:
       **How to do it:**
 
       1. Find the `id` of the ticket “How do I change my email?” in the list.
-      2. `PATCH {{BASE_URL}}/api/tickets/<id>` with the `X-Student-Id`,
-         `X-Task-Code: ch03-task7` and `Content-Type: application/json` headers and the
+      2. `PATCH {{BASE_URL}}/api/tickets/<id>` with the `X-Student-Id` and
+         `Content-Type: application/json` headers and the
          body `{"priority": "high"}`.
 
       **What you should get:** `409 Conflict`, with `error: "ticket_closed"` in the body.
@@ -239,7 +235,7 @@ tasks:
       A customer writes: “I created a request **“SMS code not received”**, but it's not in
       the list! Did you lose it?”
 
-      **How to do it** (headers `X-Student-Id` and `X-Task-Code: ch03-task8`):
+      **How to do it** (the `X-Student-Id` header):
       `GET {{BASE_URL}}/api/tickets`, and in the **Params** tab add `page` = `2`.
 
       **What you should get:** status `200`, the ticket “SMS code not received” in `items`.
@@ -270,7 +266,7 @@ tasks:
     description_md: |
       The training endpoint `{{BASE_URL}}/api/limited` allows 3 requests per 10 seconds.
 
-      **How to do it** (headers `X-Student-Id` and `X-Task-Code: ch03-task9`):
+      **How to do it** (the `X-Student-Id` header):
       send `GET {{BASE_URL}}/api/limited` several times in a row until you get
       `429 Too Many Requests`.
 
@@ -288,7 +284,7 @@ tasks:
     description_md: |
       The server answered `429` in task 9. Repeat the request so that it goes through.
 
-      **How to do it** (headers `X-Student-Id` and `X-Task-Code: ch03-task10`):
+      **How to do it** (the `X-Student-Id` header):
       wait as many seconds as `Retry-After` said and send `GET {{BASE_URL}}/api/limited`
       once.
 
@@ -322,7 +318,7 @@ tasks:
 
       Reproduce the error.
 
-      **How to do it** (headers `X-Student-Id`, `X-Task-Code: ch03-task11`,
+      **How to do it** (headers `X-Student-Id` and
       `Content-Type: application/json`):
 
       1. Find the `id` of the ticket “Promo code does not work” — it's the 10th, the
@@ -348,7 +344,7 @@ tasks:
     description_md: |
       Fix the developer's request from task 11 so the server accepts it.
 
-      **How to do it** (headers `X-Student-Id`, `X-Task-Code: ch03-task12`,
+      **How to do it** (headers `X-Student-Id` and
       `Content-Type: application/json`): the same `PUT {{BASE_URL}}/api/tickets/<id>`,
       but add the missing field from `details.missing` with its previous value (`low`):
 
@@ -395,7 +391,7 @@ tasks:
       unavailable’. What's wrong with my account?” Reproduce the error and collect the
       data for an escalation.
 
-      **How to do it** (headers `X-Student-Id` and `X-Task-Code: ch03-task13`):
+      **How to do it** (the `X-Student-Id` header):
 
       1. `GET {{BASE_URL}}/api/status/503` — a training address that always answers
          `503 Service Unavailable`.

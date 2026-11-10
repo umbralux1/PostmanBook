@@ -84,6 +84,28 @@ async def journal_stream(request: Request, user: RequiredUserDep) -> StreamingRe
     )
 
 
+class CurrentTaskIn(BaseModel):
+    task_id: str = Field(max_length=64)
+
+
+@journal_router.put("/task")
+@limiter.limit(RATE_LIMIT)
+def set_current_task(
+    request: Request, body: CurrentTaskIn, session: SessionDep, user: RequiredUserDep
+) -> dict[str, Any]:
+    """Задание, выбранное на странице главы фазы 2: ему засчитываются следующие запросы
+    ученика из Postman. Заголовок с кодом задания в Postman не нужен.
+    """
+    task = get_task_or_404(session, body.task_id)
+    if task.phase != 2:
+        raise ApiError(400, "wrong_phase", "Это задание решается не в настоящем Postman.")
+    if user.phase2_task != task.id:
+        user.phase2_task = task.id
+        session.add(user)
+        session.commit()
+    return {"task_id": task.id}
+
+
 class CompleteIn(BaseModel):
     """Ответ(ы) сервера, по которым фронт засчитал задание. Хранится для истории."""
 

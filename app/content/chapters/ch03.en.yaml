@@ -78,18 +78,15 @@ content_md: |
   at the bottom: status, time, the **Body** and **Headers** tabs. A new request tab is
   the **+** button.
 
-  **Two headers.** The site can't see your Postman, so we sign every request with two
-  headers (the **Headers** tab, Key / Value rows):
+  **Personal code.** The site can't see your Postman, so we sign every request with a
+  header (the **Headers** tab, a Key / Value row): Key `X-Student-Id`, Value — your
+  personal code. That's how the server knows it's you: your tickets, your log. The code
+  is in the **“Your Postman”** panel on the right (the “Copy” button), the same for all
+  tasks. Without `X-Student-Id` the request won't get into the log.
 
-  | Key | Value | Why |
-  |---|---|---|
-  | `X-Student-Id` | your personal code | the server knows it's you: your tickets, your log |
-  | `X-Task-Code` | the task code, e.g. `ch03-task1` | the server knows which task the request is for |
-
-  Both values are in the **“Your Postman”** panel on the right (the “Copy” button).
-  Your personal code is the same for all tasks, while `X-Task-Code` changes with the
-  task. Without `X-Student-Id` the request won't get into the log; without
-  `X-Task-Code` it won't count.
+  **Which task you're solving** is picked on the page, as in chapters 1–2: with the
+  “Solve” button on a card, or automatically when the previous task is completed. A
+  request from Postman counts for the task that is selected when you send it.
 
   **How it's checked.** The server records each of your requests together with its
   response. The “Your Postman” panel shows the log right away, without reloading the
