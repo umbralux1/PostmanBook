@@ -3,16 +3,232 @@ title: "Authorization and tokens"
 order: 4
 phase: 2
 reset: [auth]  # Reset database возвращает к началу эти учебные данные
-estimated_minutes: 75
+estimated_minutes: 80
 goal: |
   Learn to tell `401` from `403` and explain the difference to a user.
+after_completion: |
+  After this chapter you will be able to: get a token and sign in with it in the real Postman; use the Authorization tab (Bearer Token, Basic Auth, API Key); name the cause of a 401 from the response body (no credentials, typo, expired, revoked) and tell it apart from a 403; explain to a customer why they need to sign in again after a password change; and handle a token sent in a ticket the right way.
+checklist:
+  - "I know the difference: 401 is “who are you?”, 403 is “you can't go there”."
+  - "I can get a token by signing in and send it in the Authorization: Bearer header."
+  - "I can use the Authorization tab in Postman: Bearer Token, Basic Auth, API Key."
+  - "I know that Basic is base64, not encryption."
+  - "From the error field of a 401 body I can name the cause: no credentials, typo, expired, revoked."
+  - "I know why old tokens return 401 after a password change."
+  - "I never ask a customer for their password, and I ask them to revoke a token shown in a screenshot."
+quiz:
+  - id: q1
+    question: "A customer is signed in to the app, opens the “Reports” section and gets `403 Forbidden`. Other sections work. What is the likely cause?"
+    options:
+      A: "The token has expired — they need to sign in again"
+      B: "The account has no permission for this section"
+      C: "The server is down — this is a 5xx error"
+      D: "The customer typed the wrong password"
+    answer: B
+    explanation: "403 means the server knows who this is but denies access. Signing in again won't help: an administrator grants permissions. An expired token or a wrong password is a 401."
+  - id: q2
+    question: "A request has the header `Authorization: Basic YWdlbnQ6c3VwcG9ydDEyMw==`. Which is true?"
+    options:
+      A: "The password is securely encrypted, so the header can be shown"
+      B: "It is a token that will expire soon"
+      C: "It is a username and password in base64 — easy to decode, so the header is as secret as a password"
+      D: "It is an API key"
+    answer: C
+    explanation: "Base64 is not encryption, just another alphabet: “agent:support123” is recovered in a second. Never show a Basic header to anyone."
+  - id: q3
+    question: "A customer attached a Postman screenshot to a ticket that shows their whole token. What do we do?"
+    options:
+      A: "Use the token to check their account"
+      B: "Paste the token into an online decoder to see what's inside"
+      C: "Nothing — a token isn't a password"
+      D: "Don't use the token, ask the customer to revoke it (sign out of all devices or change the password), and mask the token in the escalation"
+    answer: D
+    explanation: "A token is a temporary pass: anyone who has seen it can sign in. We don't use other people's tokens or paste them into third-party sites; we ask for it to be revoked and mask it in messages and escalations."
+  - id: q4
+    question: "A customer changed their password on their phone, and now an integration on their server gets `401` with `error: token_revoked`. Why?"
+    options:
+      A: "A password change revokes previously issued tokens and keys — the integration needs a new one"
+      B: "The server broke after the password change"
+      C: "The customer's permissions were taken away"
+      D: "The integration sends too many requests"
+    answer: A
+    explanation: "This is by design: if the password leaked, changing it signs out everyone who used the old one. The fix is to sign in again and update the token or key in the integration."
+  - id: q5
+    question: "A customer's request gets `403` with `error: insufficient_role`. What do you tell them?"
+    options:
+      A: "“Sign out and sign in again”"
+      B: "“Please send us your password and we'll check”"
+      C: "“Your account doesn't have the required role. Your organization's administrator grants access — please contact them”"
+      D: "“It's a failure on our side, we're already fixing it”"
+    answer: C
+    explanation: "With a 403 the sign-in is fine, the permissions are missing. Signing in again won't help, we never ask for a password, and nothing is broken — they need a role from the administrator."
 content_md: |
-  > **This chapter is in progress.** Theory and tasks will be added later.
+  “Yesterday everything worked, today the app says ‘Error 401’” is one of the most
+  common tickets. In this chapter we look at how the server knows who sent a request,
+  why a pass stops working, and how to tell “not let in” from “not allowed” by the
+  response.
 
-  What the chapter will cover:
+  ## 4.1. Who are you and what are you allowed to do
 
-  - the `Authorization` header: Bearer, API Key, Basic;
-  - the Authorization tab in Postman;
-  - `401` vs `403`: what's the difference;
-  - expired and revoked tokens;
-  - what to do with tokens users send in tickets.
+  The server asks a request two questions:
+
+  1. **Who are you?** This is **authentication**. The request shows a “pass”: a
+     token, a key, or a username and password. No pass, or it's no good —
+     `401 Unauthorized`.
+  2. **What are you allowed to do?** This is **authorization**. The server knows who
+     you are and checks your permissions. No permission — `403 Forbidden`.
+
+  Think of an office with a turnstile. `401`: the guard won't let you in because you
+  have no pass or it has expired. `403`: your pass is fine, but you're not allowed
+  into the server room.
+
+  > 💡 **The main rule:** with a `401`, **signing in again** (getting a new pass)
+  > helps. With a `403`, signing in again **won't help**: you need permissions, and
+  > an administrator grants them.
+
+  ## 4.2. Three ways to show a pass
+
+  | Method | What the header looks like | Where you see it |
+  |---|---|---|
+  | **Bearer token** | `Authorization: Bearer tok_3f8a…` | apps and websites after sign-in |
+  | **Basic** | `Authorization: Basic YWdlbnQ6c3VwcG9ydDEyMw==` | older systems, internal services |
+  | **API Key** | `X-API-Key: key_12ab…` | server-to-server integrations, scripts |
+
+  - **Bearer** (“the one who carries it”): whoever shows the token gets in. The word
+    `Bearer`, one space, the token — no quotes, no colons.
+  - **Basic**: username and password joined by a colon (`agent:support123`), written
+    in **base64**. Base64 is **not encryption**: anyone can decode it in a second. A
+    Basic header is as secret as a password.
+  - **API Key**: a long key with no expiry, usually in a header of its own (here,
+    `X-API-Key`). The key goes **in a header, not in the address**: request addresses
+    end up in server logs and browser history.
+
+  ## 4.3. The Authorization tab in Postman
+
+  You don't need to type the `Authorization` header by hand. In the **Authorization**
+  tab (next to Params and Headers) pick an **Auth Type**:
+
+  - **Bearer Token** — paste the token into the **Token** field and Postman adds
+    `Authorization: Bearer <token>` itself;
+  - **Basic Auth** — enter the **Username** and **Password**, and Postman encodes
+    them in base64 itself;
+  - **API Key** — **Key** (the header name, here `X-API-Key`), **Value** (the key)
+    and **Add to**: **Header** (correct) or **Query Params** (the key goes into the
+    address).
+
+  The resulting header is visible in the **Headers** tab (rows hidden by default are
+  shown with the eye button, “hidden”). Don't add `Authorization` again by hand in
+  Headers — you'll lose track of which of the two was sent.
+
+  Keep adding the `X-Student-Id` header in the **Headers** tab: it's your personal
+  code for the log, not authorization.
+
+  > The **Inherit auth from parent** type takes authorization from the collection —
+  > handy when you have many requests. Collections are covered in chapter 5.
+
+  ## 4.4. Where a token comes from
+
+  A password is like a passport: you show it once, when you sign in. In return the
+  server issues a **token** — a temporary pass — and further requests use it.
+
+  ```
+  POST {{BASE_URL}}/api/auth/login
+  {"username": "agent", "password": "support123"}
+
+  → 200
+  {
+    "access_token": "tok_3f8a…",
+    "token_type": "Bearer",
+    "expires_in": 900,
+    "role": "agent"
+  }
+  ```
+
+  - `access_token` — the token itself, paste it into Bearer Token;
+  - `token_type: "Bearer"` — how to show it;
+  - `expires_in` — how many seconds the token is valid (here, 15 minutes).
+
+  The training account is username `agent`, password `support123`, role `agent` (a
+  support agent). Every student has their own: changing your password doesn't affect
+  anyone else.
+
+  > ⚠️ **The training API is a sandbox.** Changed the password and forgot it? Restore
+  > the account: `POST {{BASE_URL}}/api/auth/reset` with the `X-Student-Id` header
+  > (the password is `support123` again, all tokens and keys are revoked). The
+  > **Reset database** button in the page header does the same and resets your
+  > progress on the tasks and the chapter quiz.
+
+  ## 4.5. 401 or 403: troubleshooting
+
+  The code is the same, but a `401` has several causes. A good API writes the cause in
+  the body (`error`, `message`) and adds the **`WWW-Authenticate`** header — “how to
+  sign in to me” (here, `Bearer realm="trainer"`).
+
+  | `error` in the training API | What happened | What we do |
+  |---|---|---|
+  | `missing_credentials` | no pass: Authorization forgotten, token sent in the address | add authorization, put the token in a header |
+  | `malformed_authorization` | the header is written wrong: no `Bearer` word, an extra colon, quotes | fix the format: `Bearer <token>` |
+  | `invalid_token` | no such token: a typo, cut off when copied, issued on another site (staging instead of production) | copy the whole token, check the site address |
+  | `invalid_credentials` | wrong username or password | check the details, reset the password if needed |
+  | `token_expired` | the token has expired | sign in again |
+  | `token_revoked` | the token was revoked: password changed, “signed out of all devices” | sign in again, update the token in the integration |
+
+  A `403` has a different cause — **missing permissions**: the wrong role
+  (`insufficient_role`), or the resource belongs to another account. The sign-in is
+  fine here, and a new token changes nothing.
+
+  What to tell the customer:
+
+  - `401`: “Your session is out of date or your sign-in details are wrong. Sign out
+    and sign in again.” For an integration — “update the token (key) in the settings.”
+  - `403`: “Your account doesn't have access to this section. Your organization's
+    administrator grants permissions.”
+
+  ## 4.6. Expired and revoked tokens
+
+  Tokens are short-lived on purpose: if one is stolen, the thief can use it only until
+  it expires. So `token_expired` is a normal part of a token's life, not a failure.
+  Apps usually get a new token on their own; if not, the user sees “sign in again”.
+
+  **Revoking** switches a token off before it expires:
+
+  - **a password change** revokes all old tokens and keys: if the password leaked,
+    everyone who signed in with it is “kicked out”;
+  - **“sign out of all devices”** — the same without changing the password;
+  - **revoking an API key** — in the integration settings.
+
+  Hence the ticket: “I changed my password, and the integration (bot, export) returns
+  `401`.” Answer: the integration used the old token or key, and it was revoked; get a
+  new one and update it in the integration settings.
+
+  ## 4.7. Tokens in tickets
+
+  - **Never ask for a password.** Not in chat, not by email, not “to check”. If access
+    is needed, there are proper tools and procedures for that.
+  - **A token in a screenshot** is just as secret: anyone who has seen it can sign in.
+    Don't use it, ask the customer to revoke it (sign out of all devices or change the
+    password), and remove or hide the attachment according to company rules.
+  - **Mask it in escalations**: `Bearer tok_3f…9a` instead of the whole token. The log
+    in the “Your Postman” panel does the same — and so do real server logs.
+  - **Don't paste tokens into third-party sites** (decoders, “checkers”, online JSON
+    formatters): you don't know who stores them.
+  - **Don't use a customer's production tokens** for your own checks: use your own
+    test account.
+
+  > Some tokens carry data inside: owner, role, expiry. They are called **JWT** and
+  > get a chapter of their own. The training API's `tok_…` tokens are opaque: you
+  > can't learn anything from the token itself, only the server knows.
+
+  ## Glossary
+
+  | Term | In plain words |
+  |---|---|
+  | Authentication | Checking “who you are”; failed — `401` |
+  | Authorization | Checking “what you may do”; no permission — `403` |
+  | Token | A temporary pass issued after sign-in |
+  | Bearer | A way to show a token: `Authorization: Bearer <token>` |
+  | Basic | Username and password in base64 in the `Authorization` header — not encryption |
+  | API Key | A long-lived key for integrations, usually in its own header (`X-API-Key`) |
+  | Role | The set of permissions of an account (`agent`, `admin`…) |
+  | Revoking | Switching off a token or key before it expires (for example, by a password change) |
+  | `WWW-Authenticate` | A `401` response header: how to sign in |

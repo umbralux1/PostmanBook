@@ -1,0 +1,352 @@
+chapter_id: ch04
+tasks:
+  - id: ch04-task1
+    order: 1
+    phase: 2
+    title: "No pass"
+    description_md: |
+      See what the server answers when no pass is shown.
+
+      **How to do it:** `GET {{BASE_URL}}/api/auth/me` (“who am I”) with the
+      `X-Student-Id` header — and no authorization at all (in the **Authorization**
+      tab — **No Auth**).
+
+      **What you should see:**
+      - status `401 Unauthorized`;
+      - in the body `error: "missing_credentials"` and a `message` saying what to do;
+      - in the response **Headers** tab — `WWW-Authenticate`.
+
+      **Ask yourself:** is this a `401` or a `403` — and why?
+
+      <details markdown="1">
+      <summary>Check yourself</summary>
+
+      `401`: the server doesn't know who you are — no pass was shown. A `403` would mean
+      the server recognized you but didn't let you in. `WWW-Authenticate: Bearer …`
+      tells you how to sign in: with a Bearer token.
+
+      </details>
+    expected:
+      request: {method: GET, path: /api/auth/me}
+      response:
+        - {path: status, equals: 401, hint: "A 401 is expected. Send GET {{BASE_URL}}/api/auth/me without authorization: No Auth in the Authorization tab, only X-Student-Id in Headers."}
+        - {path: body.error, equals: missing_credentials, hint: "The error should be missing_credentials — no pass at all. Remove the Authorization and X-API-Key headers."}
+        - {path: headers.www-authenticate, exists: true, hint: "The response has no WWW-Authenticate header — you need {{BASE_URL}}/api/auth/me."}
+
+  - id: ch04-task2
+    order: 2
+    phase: 2
+    title: "Get a token"
+    description_md: |
+      Sign in with the training account and get a token.
+
+      **How to do it:**
+
+      1. `POST {{BASE_URL}}/api/auth/login`, with `X-Student-Id` in **Headers**.
+      2. **Body** → **raw** → **JSON** on the right:
+
+         ```json
+         {"username": "agent", "password": "support123"}
+         ```
+
+      3. **Send.**
+
+      **What you should see:**
+      - status `200`;
+      - in the body `access_token` (a `tok_…` string), `token_type: "Bearer"`, `expires_in`.
+
+      Copy the `access_token` — you'll need it in the next tasks. The token lives for
+      15 minutes: if it expires, just sign in again.
+
+      **Ask yourself:** how many seconds is the token valid, and where does it say so?
+
+      <details markdown="1">
+      <summary>Check yourself</summary>
+
+      `expires_in: 900` — 900 seconds, 15 minutes. The exact end time is in `expires_at`.
+
+      </details>
+    expected:
+      request: {method: POST, path: /api/auth/login}
+      response:
+        - {path: status, equals: 200, hint: "Sign-in failed. 401 invalid_credentials — wrong username or password: agent / support123 (changed the password in task 10? Restore the account: POST {{BASE_URL}}/api/auth/reset). 415 — choose Body → raw → JSON. 422 — the JSON has no username or password."}
+        - {path: body.access_token, exists: true, hint: "The response has no access_token — you need POST {{BASE_URL}}/api/auth/login."}
+        - {path: body.token_type, equals: Bearer, hint: "token_type should be Bearer — you need POST {{BASE_URL}}/api/auth/login."}
+
+  - id: ch04-task3
+    order: 3
+    phase: 2
+    title: "Sign in with a token"
+    description_md: |
+      Show the token from task 2.
+
+      **How to do it:**
+
+      1. `GET {{BASE_URL}}/api/auth/me`, with `X-Student-Id` in **Headers**.
+      2. **Authorization** tab → **Auth Type: Bearer Token** → paste the
+         `access_token` from task 2 into the **Token** field (without quotes).
+      3. **Send.**
+
+      **What you should see:**
+      - status `200`;
+      - in the body `username: "agent"`, `role: "agent"`, `auth: "bearer"`.
+
+      Look at the request **Headers** tab (the “hidden” button): Postman added
+      `Authorization: Bearer tok_…` itself. The log on the right doesn't show the whole
+      token — that's how secrets are masked in logs.
+    expected:
+      request: {method: GET, path: /api/auth/me}
+      response:
+        - {path: status, equals: 200, hint: "The server didn't answer 200 — read error in the body. missing_credentials — the token wasn't sent (Authorization → Bearer Token, not Params). malformed_authorization — the format: Bearer, a space, the token without quotes. invalid_token — copy the whole access_token. token_expired — the token is older than 15 minutes: sign in again (task 2)."}
+        - {path: body.auth, equals: bearer, hint: "You are signed in, but not with a token. Choose Authorization → Bearer Token and paste the access_token from task 2."}
+        - {path: body.username, equals: agent, hint: "The signed-in user should be agent."}
+
+  - id: ch04-task4
+    order: 4
+    phase: 2
+    title: "Basic Auth"
+    description_md: |
+      Sign in without a token — with a username and password in every request.
+
+      **How to do it:** `GET {{BASE_URL}}/api/auth/me` with `X-Student-Id`,
+      **Authorization** tab → **Basic Auth**: **Username** `agent`, **Password**
+      `support123`.
+
+      **What you should see:** status `200`, `auth: "basic"` in the body.
+
+      **Ask yourself:** look at the request Headers — what did Postman write after the
+      word `Basic`? Is it encrypted?
+
+      <details markdown="1">
+      <summary>Check yourself</summary>
+
+      `YWdlbnQ6c3VwcG9ydDEyMw==` is `agent:support123` in base64. It's not encryption:
+      anyone can decode it. That's why a Basic header is as secret as a password.
+
+      </details>
+    expected:
+      request: {method: GET, path: /api/auth/me}
+      response:
+        - {path: status, equals: 200, hint: "The server didn't answer 200. invalid_credentials — wrong username or password: agent / support123 (changed the password? Restore the account: POST {{BASE_URL}}/api/auth/reset). missing_credentials — choose Authorization → Basic Auth."}
+        - {path: body.auth, equals: basic, hint: "You are signed in, but not with Basic. Choose Authorization → Basic Auth and enter agent / support123."}
+
+  - id: ch04-task5
+    order: 5
+    phase: 2
+    title: "Create an API key"
+    description_md: |
+      For integrations (bots, exports) a key with no expiry is handier than a
+      15-minute token. Create an API key.
+
+      **How to do it:** `POST {{BASE_URL}}/api/auth/api-keys` with `X-Student-Id` and
+      **Bearer Token** authorization (the token from task 2). No body is needed.
+
+      **What you should see:** status `201 Created`, `api_key` (a `key_…` string) in
+      the body.
+
+      Copy the `api_key` — you'll need it in the next task.
+    expected:
+      request: {method: POST, path: /api/auth/api-keys}
+      response:
+        - {path: status, equals: 201, hint: "The key wasn't created. You need POST {{BASE_URL}}/api/auth/api-keys with a Bearer Token. 401 — read error: the token wasn't sent, is wrong or has expired (sign in again, task 2). 405 — the method isn't POST."}
+        - {path: body.api_key, exists: true, hint: "The response has no api_key — you need POST {{BASE_URL}}/api/auth/api-keys."}
+
+  - id: ch04-task6
+    order: 6
+    phase: 2
+    title: "Sign in with an API key"
+    description_md: |
+      Show the key from task 5.
+
+      **How to do it:** `GET {{BASE_URL}}/api/auth/me` with `X-Student-Id`,
+      **Authorization** tab → **API Key**:
+      - **Key** — `X-API-Key`;
+      - **Value** — the `api_key` from task 5;
+      - **Add to** — **Header**.
+
+      **What you should see:** status `200`, `auth: "api_key"` in the body.
+
+      **Ask yourself:** what will the server answer if you choose **Query Params** in
+      **Add to**?
+
+      <details markdown="1">
+      <summary>Check yourself</summary>
+
+      `401 missing_credentials`: the key went into the address, and the server accepts
+      it only in a header. Request addresses end up in logs and browser history — the
+      key would be exposed there.
+
+      </details>
+    expected:
+      request: {method: GET, path: /api/auth/me}
+      response:
+        - {path: status, equals: 200, hint: "The server didn't answer 200 — read the message. missing_credentials — the key went into the address: choose Header in Add to. invalid_token — the key wasn't copied whole, or it's a tok_… token while you need the key_… key from task 5. token_revoked — the key was revoked by a password change: create a new one (task 5)."}
+        - {path: body.auth, equals: api_key, hint: "You are signed in, but not with a key. Choose Authorization → API Key: Key X-API-Key, Value — the key from task 5, Add to — Header."}
+
+  - id: ch04-task7
+    order: 7
+    phase: 2
+    title: "401 or 403"
+    description_md: |
+      A customer writes: “I'm signed in, but the staff list won't open — there's an
+      error.” Reproduce it.
+
+      **How to do it:** `GET {{BASE_URL}}/api/admin/users` with `X-Student-Id` and the
+      **Bearer Token** from task 2.
+
+      **What you should see:**
+      - status `403 Forbidden`;
+      - in the body `error: "insufficient_role"`, `details.required_role: "admin"`.
+
+      **Ask yourself:** will signing out and in again help the customer? What do you
+      tell them?
+
+      <details markdown="1">
+      <summary>Check yourself</summary>
+
+      It won't: the server knows who this is (`your_role: "agent"`), but the staff list
+      is only for `admin`. Answer: “Your account doesn't have access to this section.
+      Your organization's administrator grants permissions — please contact them.”
+
+      </details>
+    expected:
+      request: {method: GET, path: /api/admin/users}
+      response:
+        - {path: status, equals: 403, hint: "A 403 is expected. Got a 401 — the server didn't recognize you: add a Bearer Token (expired? sign in again, task 2). The address is {{BASE_URL}}/api/admin/users."}
+        - {path: body.error, equals: insufficient_role, hint: "The error should be insufficient_role — you need {{BASE_URL}}/api/admin/users."}
+        - {path: body.details.required_role, equals: admin, hint: "details.required_role should be admin — you need {{BASE_URL}}/api/admin/users."}
+
+  - id: ch04-task8
+    order: 8
+    phase: 2
+    title: "A short-lived token"
+    description_md: |
+      Waiting 15 minutes for a token to expire takes too long. The training API lets
+      you set the lifetime yourself — get a token for 10 seconds.
+
+      **How to do it:** as in task 2, but add `expires_in` to the body:
+
+      ```json
+      {"username": "agent", "password": "support123", "expires_in": 10}
+      ```
+
+      **What you should see:** status `200`, `expires_in: 10`.
+
+      Copy the `access_token` and go straight to task 9.
+    expected:
+      request: {method: POST, path: /api/auth/login}
+      response:
+        - {path: status, equals: 200, hint: "Sign-in failed. 401 — wrong username or password (agent / support123). 422 — check expires_in: a whole number without quotes, from 5 to 3600. 415 — choose Body → raw → JSON."}
+        - {path: body.expires_in, equals: 10, hint: "The token wasn't issued for 10 seconds. Add \"expires_in\": 10 to the body — as a number, without quotes."}
+
+  - id: ch04-task9
+    order: 9
+    phase: 2
+    title: "An expired token"
+    description_md: |
+      Wait 10 seconds after task 8 and show that short-lived token.
+
+      **How to do it:** `GET {{BASE_URL}}/api/auth/me` with `X-Student-Id` and a
+      **Bearer Token** — the `access_token` from task 8.
+
+      **What you should see:** status `401`, `error: "token_expired"` in the body.
+
+      **Ask yourself:** how does this `401` differ from task 1, and what should the
+      customer do?
+
+      <details markdown="1">
+      <summary>Check yourself</summary>
+
+      In task 1 there was no pass (`missing_credentials`); here there was one, but it
+      expired (`expired_at` in `details`). The customer should sign in again. Apps
+      usually get a new token on their own; if users are “kicked out” too often, that's
+      a reason to escalate.
+
+      </details>
+    expected:
+      request: {method: GET, path: /api/auth/me}
+      response:
+        - {path: status, equals: 401, hint: "The token is still valid. Wait 10 seconds after task 8 and send the request with the token from task 8 specifically (not from task 2 — that one lives 15 minutes)."}
+        - {path: body.error, equals: token_expired, hint: "The error should be token_expired. You need the Bearer Token from task 8 (10 seconds) — read the message: maybe the token wasn't sent or wasn't copied whole."}
+
+  - id: ch04-task10
+    order: 10
+    phase: 2
+    title: "Change the password"
+    description_md: |
+      Change the training account's password.
+
+      **How to do it:**
+
+      1. `POST {{BASE_URL}}/api/auth/change-password` with `X-Student-Id` and a
+         **Bearer Token** (a valid token: from task 2, or sign in again).
+      2. **Body** → **raw** → **JSON**:
+
+         ```json
+         {"old_password": "support123", "new_password": "newpass123"}
+         ```
+
+      **What you should see:** status `200`, `changed: true`, and in `revoked` — how
+      many tokens and keys were revoked.
+
+      Remember the new password — you'll need it in task 12.
+
+      > The password is now `newpass123`: tasks 2–8 won't sign in with `support123`.
+      > To restore the account — `POST {{BASE_URL}}/api/auth/reset` with `X-Student-Id`.
+    expected:
+      request: {method: POST, path: /api/auth/change-password}
+      response:
+        - {path: status, equals: 200, hint: "The password wasn't changed — read error. 401 — the token wasn't sent, has expired or was revoked: sign in again (task 2). 400 invalid_old_password — the old password is wrong (already changed it? Restore the account: POST {{BASE_URL}}/api/auth/reset). 422 — no old_password or new_password, or the new password is shorter than 6 characters or the same as the old one."}
+        - {path: body.changed, equals: true, hint: "The response has no changed: true — you need POST {{BASE_URL}}/api/auth/change-password."}
+
+  - id: ch04-task11
+    order: 11
+    phase: 2
+    title: "Mini-ticket: “everything is 401 after a password change”"
+    description_md: |
+      A customer writes: “I changed my password, and our integration stopped working —
+      the server answers 401. Did you break something?” Reproduce it.
+
+      **How to do it:** `GET {{BASE_URL}}/api/auth/me` with `X-Student-Id` and a
+      **Bearer Token** — one you got **before** the password change in task 10.
+
+      **What you should see:** status `401`, `error: "token_revoked"` in the body.
+
+      **Ask yourself:** what do you tell the customer?
+
+      <details markdown="1">
+      <summary>Check yourself</summary>
+
+      Nothing is broken: a password change revokes all previously issued tokens and
+      keys — a safeguard in case the password leaked. Answer: “The integration used the
+      old token. Get a new one (sign in with the new password) and update it in the
+      integration settings.”
+
+      </details>
+    expected:
+      request: {method: GET, path: /api/auth/me}
+      response:
+        - {path: status, equals: 401, hint: "The server let you in — so the token was issued after the password change. Use the old token, issued before task 10."}
+        - {path: body.error, equals: token_revoked, hint: "The error should be token_revoked. You need a token issued before the password change — read the message: maybe the token wasn't sent, expired earlier or wasn't copied whole."}
+
+  - id: ch04-task12
+    order: 12
+    phase: 2
+    title: "Mini-ticket: a new token"
+    description_md: |
+      Show the customer the fix: get a new token.
+
+      **How to do it:** `POST {{BASE_URL}}/api/auth/login` with `X-Student-Id` and a
+      body with the **new** password from task 10:
+
+      ```json
+      {"username": "agent", "password": "newpass123"}
+      ```
+
+      **What you should see:** status `200` and a new `access_token`. With it,
+      `/api/auth/me` answers `200` again — check it.
+    expected:
+      request: {method: POST, path: /api/auth/login}
+      response:
+        - {path: status, equals: 200, hint: "Sign-in failed. 401 invalid_credentials — after task 10 the password is new (newpass123 or the one you set). 415 — choose Body → raw → JSON."}
+        - {path: body.access_token, exists: true, hint: "The response has no access_token — you need POST {{BASE_URL}}/api/auth/login."}

@@ -1,0 +1,351 @@
+chapter_id: ch04
+# Фаза 2, как глава 3: запросы из настоящего Postman с заголовком X-Student-Id, задание
+# выбрано на странице. Задания атомарные: один запрос — одна проверка ответа; токен и
+# ключ берутся из ответов предыдущих заданий.
+# Учётка agent / support123 у каждого ученика своя (services/auth_tokens.py).
+tasks:
+  - id: ch04-task1
+    order: 1
+    phase: 2
+    title: "Без пропуска"
+    description_md: |
+      Посмотри, что отвечает сервер, если пропуск не предъявлен.
+
+      **Как сделать:** `GET {{BASE_URL}}/api/auth/me` («кто я») с заголовком
+      `X-Student-Id` — и без всякой авторизации (во вкладке **Authorization** —
+      **No Auth**).
+
+      **Что должно быть:**
+      - статус `401 Unauthorized`;
+      - в теле `error: "missing_credentials"` и `message` — что сделать;
+      - во вкладке **Headers** ответа — `WWW-Authenticate`.
+
+      **Ответь себе:** это `401` или `403` — и почему?
+
+      <details markdown="1">
+      <summary>Проверь себя</summary>
+
+      `401`: сервер не знает, кто ты, — пропуск не предъявлен. `403` было бы, если бы
+      сервер тебя узнал, но не пустил. `WWW-Authenticate: Bearer …` подсказывает, как
+      входить: токеном Bearer.
+
+      </details>
+    expected:
+      request: {method: GET, path: /api/auth/me}
+      response:
+        - {path: status, equals: 401, hint: "Ожидается 401. Отправь GET {{BASE_URL}}/api/auth/me без авторизации: во вкладке Authorization — No Auth, в Headers — только X-Student-Id."}
+        - {path: body.error, equals: missing_credentials, hint: "Ошибка должна быть missing_credentials — пропуска нет вовсе. Убери заголовок Authorization и X-API-Key."}
+        - {path: headers.www-authenticate, exists: true, hint: "В ответе нет заголовка WWW-Authenticate — нужен {{BASE_URL}}/api/auth/me."}
+
+  - id: ch04-task2
+    order: 2
+    phase: 2
+    title: "Получить токен"
+    description_md: |
+      Войди учебной учёткой и получи токен.
+
+      **Как сделать:**
+
+      1. `POST {{BASE_URL}}/api/auth/login`, в **Headers** — `X-Student-Id`.
+      2. **Body** → **raw** → справа **JSON**:
+
+         ```json
+         {"username": "agent", "password": "support123"}
+         ```
+
+      3. **Send.**
+
+      **Что должно быть:**
+      - статус `200`;
+      - в теле `access_token` (строка `tok_…`), `token_type: "Bearer"`, `expires_in`.
+
+      Скопируй `access_token` — он нужен в следующих заданиях. Токен живёт 15 минут:
+      истёк — просто войди ещё раз.
+
+      **Ответь себе:** сколько секунд действует токен и где это написано?
+
+      <details markdown="1">
+      <summary>Проверь себя</summary>
+
+      `expires_in: 900` — 900 секунд, 15 минут. Точное время окончания — в `expires_at`.
+
+      </details>
+    expected:
+      request: {method: POST, path: /api/auth/login}
+      response:
+        - {path: status, equals: 200, hint: "Вход не удался. 401 invalid_credentials — неверный логин или пароль: agent / support123 (менял пароль в задании 10 — верни учётку: POST {{BASE_URL}}/api/auth/reset). 415 — выбери Body → raw → JSON. 422 — в JSON нет username или password."}
+        - {path: body.access_token, exists: true, hint: "В ответе нет access_token — нужен POST {{BASE_URL}}/api/auth/login."}
+        - {path: body.token_type, equals: Bearer, hint: "token_type должен быть Bearer — нужен POST {{BASE_URL}}/api/auth/login."}
+
+  - id: ch04-task3
+    order: 3
+    phase: 2
+    title: "Войти по токену"
+    description_md: |
+      Предъяви токен из задания 2.
+
+      **Как сделать:**
+
+      1. `GET {{BASE_URL}}/api/auth/me`, в **Headers** — `X-Student-Id`.
+      2. Вкладка **Authorization** → **Auth Type: Bearer Token** → в поле **Token**
+         вставь `access_token` из задания 2 (без кавычек).
+      3. **Send.**
+
+      **Что должно быть:**
+      - статус `200`;
+      - в теле `username: "agent"`, `role: "agent"`, `auth: "bearer"`.
+
+      Загляни во вкладку **Headers** запроса (кнопка hidden): Postman сам добавил
+      `Authorization: Bearer tok_…`. В журнале справа токен показан не целиком —
+      так секреты маскируют в логах.
+    expected:
+      request: {method: GET, path: /api/auth/me}
+      response:
+        - {path: status, equals: 200, hint: "Сервер не ответил 200 — прочитай error в теле. missing_credentials — токен не ушёл (Authorization → Bearer Token, не Params). malformed_authorization — формат: Bearer, пробел, токен без кавычек. invalid_token — скопируй access_token целиком. token_expired — токену больше 15 минут: войди снова (задание 2)."}
+        - {path: body.auth, equals: bearer, hint: "Вход есть, но не по токену. Выбери Authorization → Bearer Token и вставь access_token из задания 2."}
+        - {path: body.username, equals: agent, hint: "Должен войти пользователь agent."}
+
+  - id: ch04-task4
+    order: 4
+    phase: 2
+    title: "Basic Auth"
+    description_md: |
+      Войди без токена — логином и паролем в каждом запросе.
+
+      **Как сделать:** `GET {{BASE_URL}}/api/auth/me` с `X-Student-Id`, вкладка
+      **Authorization** → **Basic Auth**: **Username** `agent`, **Password**
+      `support123`.
+
+      **Что должно быть:** статус `200`, в теле `auth: "basic"`.
+
+      **Ответь себе:** загляни в Headers запроса — что Postman записал после слова
+      `Basic`? Это зашифровано?
+
+      <details markdown="1">
+      <summary>Проверь себя</summary>
+
+      `YWdlbnQ6c3VwcG9ydDEyMw==` — это `agent:support123` в base64. Не шифрование:
+      раскодировать может кто угодно. Поэтому Basic-заголовок — такой же секрет, как
+      пароль.
+
+      </details>
+    expected:
+      request: {method: GET, path: /api/auth/me}
+      response:
+        - {path: status, equals: 200, hint: "Сервер не ответил 200. invalid_credentials — неверный логин или пароль: agent / support123 (менял пароль — верни учётку: POST {{BASE_URL}}/api/auth/reset). missing_credentials — выбери Authorization → Basic Auth."}
+        - {path: body.auth, equals: basic, hint: "Вход есть, но не через Basic. Выбери Authorization → Basic Auth и введи agent / support123."}
+
+  - id: ch04-task5
+    order: 5
+    phase: 2
+    title: "Создать API-ключ"
+    description_md: |
+      Интеграциям (ботам, выгрузкам) удобнее ключ без срока, чем токен на 15 минут.
+      Создай API-ключ.
+
+      **Как сделать:** `POST {{BASE_URL}}/api/auth/api-keys` с `X-Student-Id` и
+      авторизацией **Bearer Token** (токен из задания 2). Тело не нужно.
+
+      **Что должно быть:** статус `201 Created`, в теле `api_key` (строка `key_…`).
+
+      Скопируй `api_key` — он нужен в следующем задании.
+    expected:
+      request: {method: POST, path: /api/auth/api-keys}
+      response:
+        - {path: status, equals: 201, hint: "Ключ не создан. Нужен POST {{BASE_URL}}/api/auth/api-keys с Bearer Token. 401 — прочитай error: токен не ушёл, неверный или истёк (войди снова, задание 2). 405 — метод не POST."}
+        - {path: body.api_key, exists: true, hint: "В ответе нет api_key — нужен POST {{BASE_URL}}/api/auth/api-keys."}
+
+  - id: ch04-task6
+    order: 6
+    phase: 2
+    title: "Войти по API-ключу"
+    description_md: |
+      Предъяви ключ из задания 5.
+
+      **Как сделать:** `GET {{BASE_URL}}/api/auth/me` с `X-Student-Id`, вкладка
+      **Authorization** → **API Key**:
+      - **Key** — `X-API-Key`;
+      - **Value** — `api_key` из задания 5;
+      - **Add to** — **Header**.
+
+      **Что должно быть:** статус `200`, в теле `auth: "api_key"`.
+
+      **Ответь себе:** что ответит сервер, если в **Add to** выбрать **Query Params**?
+
+      <details markdown="1">
+      <summary>Проверь себя</summary>
+
+      `401 missing_credentials`: ключ ушёл в адрес, а сервер принимает его только в
+      заголовке. Адрес запроса попадает в логи и историю браузера — ключ там
+      засветится.
+
+      </details>
+    expected:
+      request: {method: GET, path: /api/auth/me}
+      response:
+        - {path: status, equals: 200, hint: "Сервер не ответил 200 — прочитай message. missing_credentials — ключ ушёл в адрес: в Add to выбери Header. invalid_token — ключ скопирован не целиком или это токен tok_…, а нужен ключ key_… из задания 5. token_revoked — ключ отозван сменой пароля: создай новый (задание 5)."}
+        - {path: body.auth, equals: api_key, hint: "Вход есть, но не по ключу. Выбери Authorization → API Key: Key X-API-Key, Value — ключ из задания 5, Add to — Header."}
+
+  - id: ch04-task7
+    order: 7
+    phase: 2
+    title: "401 или 403"
+    description_md: |
+      Клиент пишет: «Вошёл, а список сотрудников не открывается — ошибка». Воспроизведи.
+
+      **Как сделать:** `GET {{BASE_URL}}/api/admin/users` с `X-Student-Id` и
+      **Bearer Token** из задания 2.
+
+      **Что должно быть:**
+      - статус `403 Forbidden`;
+      - в теле `error: "insufficient_role"`, `details.required_role: "admin"`.
+
+      **Ответь себе:** поможет ли клиенту выйти и войти снова? Что ему ответить?
+
+      <details markdown="1">
+      <summary>Проверь себя</summary>
+
+      Не поможет: сервер знает, кто это (`your_role: "agent"`), но список сотрудников —
+      только для `admin`. Ответ: «У вашей учётной записи нет доступа к этому разделу.
+      Права выдаёт администратор вашей организации — обратитесь к нему».
+
+      </details>
+    expected:
+      request: {method: GET, path: /api/admin/users}
+      response:
+        - {path: status, equals: 403, hint: "Ожидается 403. Пришёл 401 — сервер тебя не узнал: добавь Bearer Token (истёк — войди снова, задание 2). Адрес — {{BASE_URL}}/api/admin/users."}
+        - {path: body.error, equals: insufficient_role, hint: "Ошибка должна быть insufficient_role — нужен {{BASE_URL}}/api/admin/users."}
+        - {path: body.details.required_role, equals: admin, hint: "В details.required_role должно быть admin — нужен {{BASE_URL}}/api/admin/users."}
+
+  - id: ch04-task8
+    order: 8
+    phase: 2
+    title: "Короткий токен"
+    description_md: |
+      Ждать 15 минут, пока токен истечёт, долго. Учебный API разрешает задать срок
+      самому — получи токен на 10 секунд.
+
+      **Как сделать:** как в задании 2, но в теле добавь `expires_in`:
+
+      ```json
+      {"username": "agent", "password": "support123", "expires_in": 10}
+      ```
+
+      **Что должно быть:** статус `200`, `expires_in: 10`.
+
+      Скопируй `access_token` и сразу переходи к заданию 9.
+    expected:
+      request: {method: POST, path: /api/auth/login}
+      response:
+        - {path: status, equals: 200, hint: "Вход не удался. 401 — неверный логин или пароль (agent / support123). 422 — проверь expires_in: целое число без кавычек, от 5 до 3600. 415 — выбери Body → raw → JSON."}
+        - {path: body.expires_in, equals: 10, hint: "Токен выдан не на 10 секунд. Добавь в тело \"expires_in\": 10 — числом, без кавычек."}
+
+  - id: ch04-task9
+    order: 9
+    phase: 2
+    title: "Просроченный токен"
+    description_md: |
+      Подожди 10 секунд после задания 8 и предъяви тот короткий токен.
+
+      **Как сделать:** `GET {{BASE_URL}}/api/auth/me` с `X-Student-Id` и **Bearer
+      Token** — `access_token` из задания 8.
+
+      **Что должно быть:** статус `401`, в теле `error: "token_expired"`.
+
+      **Ответь себе:** чем этот `401` отличается от задания 1 и что делать клиенту?
+
+      <details markdown="1">
+      <summary>Проверь себя</summary>
+
+      В задании 1 пропуска не было (`missing_credentials`), здесь он был, но истёк
+      (`expired_at` в `details`). Клиенту — войти заново. Приложения обычно сами
+      получают новый токен; если «выкидывает» слишком часто — это повод для эскалации.
+
+      </details>
+    expected:
+      request: {method: GET, path: /api/auth/me}
+      response:
+        - {path: status, equals: 401, hint: "Токен ещё действует. Подожди 10 секунд после задания 8 и отправь запрос с токеном именно из задания 8 (не из задания 2 — тот живёт 15 минут)."}
+        - {path: body.error, equals: token_expired, hint: "Ошибка должна быть token_expired. Нужен Bearer Token из задания 8 (на 10 секунд) — прочитай message: возможно, токен не ушёл или скопирован не целиком."}
+
+  - id: ch04-task10
+    order: 10
+    phase: 2
+    title: "Смена пароля"
+    description_md: |
+      Смени пароль учебной учётки.
+
+      **Как сделать:**
+
+      1. `POST {{BASE_URL}}/api/auth/change-password` с `X-Student-Id` и **Bearer
+         Token** (действующий токен: из задания 2 или новый — войди ещё раз).
+      2. **Body** → **raw** → **JSON**:
+
+         ```json
+         {"old_password": "support123", "new_password": "newpass123"}
+         ```
+
+      **Что должно быть:** статус `200`, `changed: true`, в `revoked` — сколько
+      токенов и ключей отозвано.
+
+      Запомни новый пароль — он нужен в задании 12.
+
+      > Пароль теперь `newpass123`: задания 2–8 с `support123` не войдут. Вернуть
+      > учётку — `POST {{BASE_URL}}/api/auth/reset` с `X-Student-Id`.
+    expected:
+      request: {method: POST, path: /api/auth/change-password}
+      response:
+        - {path: status, equals: 200, hint: "Пароль не изменён — прочитай error. 401 — токен не ушёл, истёк или отозван: войди снова (задание 2). 400 invalid_old_password — старый пароль неверный (уже менял — верни учётку: POST {{BASE_URL}}/api/auth/reset). 422 — нет old_password или new_password, новый пароль короче 6 символов или совпадает со старым."}
+        - {path: body.changed, equals: true, hint: "В ответе нет changed: true — нужен POST {{BASE_URL}}/api/auth/change-password."}
+
+  - id: ch04-task11
+    order: 11
+    phase: 2
+    title: "Мини-тикет: «после смены пароля всё 401»"
+    description_md: |
+      Клиент пишет: «Сменил пароль — и наша интеграция перестала работать, сервер
+      отвечает 401. Вы что-то сломали?» Воспроизведи.
+
+      **Как сделать:** `GET {{BASE_URL}}/api/auth/me` с `X-Student-Id` и **Bearer
+      Token** — токеном, полученным **до** смены пароля в задании 10.
+
+      **Что должно быть:** статус `401`, в теле `error: "token_revoked"`.
+
+      **Ответь себе:** что ответить клиенту?
+
+      <details markdown="1">
+      <summary>Проверь себя</summary>
+
+      Ничего не сломано: смена пароля отзывает все выданные раньше токены и ключи —
+      это защита на случай, если пароль утёк. Ответ: «Интеграция работала со старым
+      токеном. Получите новый (войдите с новым паролем) и обновите его в настройках
+      интеграции».
+
+      </details>
+    expected:
+      request: {method: GET, path: /api/auth/me}
+      response:
+        - {path: status, equals: 401, hint: "Сервер пустил — значит, токен получен уже после смены пароля. Возьми старый токен, выданный до задания 10."}
+        - {path: body.error, equals: token_revoked, hint: "Ошибка должна быть token_revoked. Нужен токен, выданный до смены пароля, — прочитай message: возможно, токен не ушёл, истёк раньше или скопирован не целиком."}
+
+  - id: ch04-task12
+    order: 12
+    phase: 2
+    title: "Мини-тикет: новый токен"
+    description_md: |
+      Покажи клиенту решение: получи новый токен.
+
+      **Как сделать:** `POST {{BASE_URL}}/api/auth/login` с `X-Student-Id` и телом
+      с **новым** паролем из задания 10:
+
+      ```json
+      {"username": "agent", "password": "newpass123"}
+      ```
+
+      **Что должно быть:** статус `200` и новый `access_token`. С ним `/api/auth/me`
+      снова отвечает `200` — проверь.
+    expected:
+      request: {method: POST, path: /api/auth/login}
+      response:
+        - {path: status, equals: 200, hint: "Вход не удался. 401 invalid_credentials — после задания 10 пароль новый (newpass123 или тот, что ты задал). 415 — выбери Body → raw → JSON."}
+        - {path: body.access_token, exists: true, hint: "В ответе нет access_token — нужен POST {{BASE_URL}}/api/auth/login."}

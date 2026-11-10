@@ -129,16 +129,18 @@ async def test_pages_render_and_set_cookie(postman: AsyncClient) -> None:
     r = await postman.get("/chapters/ch03")
     assert 'class="pm"' in r.text and "Your Postman" in r.text
     assert "/partials/progress/ch03" in r.text
-    # Глава без заданий: анонс, без блока «Tasks» и счётчика заданий.
     r = await postman.get("/chapters/ch04")
+    assert "Tasks</h2>" in r.text and "/partials/progress/ch04" in r.text
+    # Глава без заданий: анонс, без блока «Tasks» и счётчика заданий.
+    r = await postman.get("/chapters/ch05")
     assert r.status_code == 200
     assert "This chapter is in progress" in r.text
     assert "Tasks</h2>" not in r.text
-    assert "/partials/progress/ch04" not in r.text
+    assert "/partials/progress/ch05" not in r.text
     r = await postman.get("/chapters/ch07")
     assert "Next chapter</div>" not in r.text  # глава 7 последняя
     r = await postman.get("/")
-    assert r.text.count(">Coming soon<") == 4
+    assert r.text.count(">Coming soon<") == 3
 
 
 async def test_api_does_not_issue_cookie(postman: AsyncClient) -> None:

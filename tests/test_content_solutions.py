@@ -5,15 +5,17 @@
 что работает в браузере. Так ловим задания, которые нельзя решить или
 которые засчитываются за неправильный запрос.
 
-Фаза 2: запросы идут «из Postman» (без cookie) с заголовками X-Student-Id и X-Task-Code,
-а история для checker.js берётся из журнала ученика (`GET /api/journal`) — как на
-странице главы.
+Фаза 2: запросы идут «из Postman» (без cookie) с заголовком X-Student-Id, задание
+выбирается на странице (`PUT /api/journal/task`), а история для checker.js берётся из
+журнала ученика (`GET /api/journal`) — как на странице главы.
 """
 
 import json
 import re
 import shutil
 import subprocess
+from contextlib import ExitStack
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -24,7 +26,7 @@ from sqlmodel import Session, select
 from app.db import get_engine
 from app.i18n import SOURCE_LANG
 from app.models import Ticket, User
-from app.services import limited
+from app.services import auth_tokens, limited
 from app.services.task_loader import TasksFile, load_task_files, load_task_translations
 from app.services.ticket_seed import ensure_seeded
 
@@ -392,6 +394,44 @@ def put(url: str, body: str) -> Req:
     return {"method": "PUT", "url": url, "headers": JSON_CT, "body": body}
 
 
+# Глава 4: токен и ключ берутся из ответов предыдущих запросов ({last:access_token},
+# {last:api_key}); шаг {"advance": N} сдвигает время учебной авторизации на N секунд.
+TOKEN = "{last:access_token}"
+API_KEY = "{last:api_key}"
+BASIC = {"Authorization": "Basic YWdlbnQ6c3VwcG9ydDEyMw=="}  # agent:support123
+BEARER = {"Authorization": f"Bearer {TOKEN}"}
+ME = "/api/auth/me"
+NEW_PASSWORD = '{"old_password": "support123", "new_password": "newpass123"}'
+
+
+def login(password: str = "support123", extra: str = "", *, untracked: bool = False) -> Req:
+    body = f'{{"username": "agent", "password": "{password}"{extra}}}'
+    req: Req = {"method": "POST", "url": "/api/auth/login", "headers": JSON_CT, "body": body}
+    if untracked:
+        req["untracked"] = True
+    return req
+
+
+def me(headers: dict[str, str], url: str = ME) -> Req:
+    return {"url": url, "headers": headers}
+
+
+def change_password(body: str = NEW_PASSWORD, *, untracked: bool = False) -> Req:
+    req: Req = {
+        "method": "POST",
+        "url": "/api/auth/change-password",
+        "headers": {**JSON_CT, **BEARER},
+        "body": body,
+    }
+    if untracked:
+        req["untracked"] = True
+    return req
+
+
+API_KEYS = {"method": "POST", "url": "/api/auth/api-keys", "headers": BEARER}
+PREP_LOGIN = login(untracked=True)
+
+
 PHASE2_SOLUTIONS: dict[str, list[Req]] = {
     "ch03-task1": [{"url": "/api/echo"}],
     "ch03-task2": [{"url": "/api/tickets"}],
@@ -428,6 +468,22 @@ PHASE2_SOLUTIONS: dict[str, list[Req]] = {
     "ch03-task11": [put(f"/api/tickets/{PROMO}", PROMO_PUT_BAD)],
     "ch03-task12": [put(f"/api/tickets/{PROMO}", PROMO_PUT_OK)],
     "ch03-task13": [{"url": "/api/status/503"}],
+    "ch04-task1": [me({})],
+    "ch04-task2": [login()],
+    "ch04-task3": [PREP_LOGIN, me(BEARER)],
+    "ch04-task4": [me(BASIC)],
+    "ch04-task5": [PREP_LOGIN, API_KEYS],
+    "ch04-task6": [PREP_LOGIN, {**API_KEYS, "untracked": True}, me({"X-API-Key": API_KEY})],
+    "ch04-task7": [PREP_LOGIN, {"url": "/api/admin/users", "headers": BEARER}],
+    "ch04-task8": [login(extra=', "expires_in": 10')],
+    "ch04-task9": [
+        login(extra=', "expires_in": 10', untracked=True),
+        {"advance": 11},
+        me(BEARER),
+    ],
+    "ch04-task10": [PREP_LOGIN, change_password()],
+    "ch04-task11": [PREP_LOGIN, change_password(untracked=True), me(BEARER)],
+    "ch04-task12": [PREP_LOGIN, change_password(untracked=True), login("newpass123")],
 }
 
 PHASE2_MISTAKES: list[tuple[str, list[Req], str]] = [
@@ -489,6 +545,49 @@ PHASE2_MISTAKES: list[tuple[str, list[Req], str]] = [
     ),
     ("ch03-task13", [{"url": "/api/status/502"}], "503"),
     ("ch03-task13", [{"url": "/api/echo"}], "503"),
+    ("ch04-task1", [PREP_LOGIN, me(BEARER)], "No Auth"),
+    ("ch04-task1", [PREP_LOGIN, me({"Authorization": TOKEN})], "missing_credentials"),
+    ("ch04-task2", [login("support")], "agent / support123"),
+    (
+        "ch04-task2",
+        [{"method": "POST", "url": "/api/auth/login", "body": '{"username": "agent"}'}],
+        "raw → JSON",
+    ),
+    ("ch04-task3", [PREP_LOGIN, me({"Authorization": TOKEN})], "malformed_authorization"),
+    ("ch04-task3", [PREP_LOGIN, me({}, f"{ME}?token={TOKEN}")], "Params"),
+    ("ch04-task3", [me(BASIC)], "Bearer Token"),
+    ("ch04-task4", [PREP_LOGIN, me(BEARER)], "Basic Auth"),
+    ("ch04-task4", [me({"Authorization": "Basic YWdlbnQ6d3Jvbmc="})], "agent / support123"),
+    ("ch04-task5", [{"method": "POST", "url": "/api/auth/api-keys"}], "401"),
+    ("ch04-task5", [PREP_LOGIN, {"url": "/api/auth/api-keys", "headers": BEARER}], "405"),
+    (
+        "ch04-task6",
+        [PREP_LOGIN, {**API_KEYS, "untracked": True}, me({}, f"{ME}?api_key={API_KEY}")],
+        "Header",
+    ),
+    ("ch04-task6", [PREP_LOGIN, me({"X-API-Key": TOKEN})], "key_"),
+    ("ch04-task7", [{"url": "/api/admin/users"}], "401"),
+    ("ch04-task8", [login()], "expires_in"),
+    ("ch04-task8", [login(extra=', "expires_in": "10"')], "без кавычек"),
+    ("ch04-task9", [login(extra=', "expires_in": 10', untracked=True), me(BEARER)], "Подожди"),
+    (
+        "ch04-task10",
+        [PREP_LOGIN, change_password('{"old_password": "x", "new_password": "newpass123"}')],
+        "invalid_old_password",
+    ),
+    ("ch04-task10", [{**change_password(), "headers": JSON_CT}], "401"),
+    (
+        "ch04-task11",
+        [
+            PREP_LOGIN,
+            change_password(untracked=True),
+            login("newpass123", untracked=True),
+            me(BEARER),
+        ],
+        "до задания 10",
+    ),
+    ("ch04-task11", [me({})], "token_revoked"),
+    ("ch04-task12", [PREP_LOGIN, change_password(untracked=True), login()], "newpass123"),
 ]
 
 _ID_RE = re.compile(r"\{id:([^}]+)\}")
@@ -542,28 +641,73 @@ async def run_phase2(
     code = await site_student_code(client)
     deleted: int | None = None
     selected = False
-    for req in requests:
-        if select_task and not selected and not req.get("untracked"):
-            r = await client.put("/api/journal/task", json={"task_id": task_id})
-            assert r.status_code == 200, r.text
-            selected = True
-        assert not (selected and req.get("untracked")), "untracked — только до выбора задания"
-        if req.get("reset_limit"):
-            limited.window.reset()
-            continue
-        url = req["url"]
-        for title in _ID_RE.findall(url):
-            url = url.replace(f"{{id:{title}}}", str(await ticket_id(postman, code, title)))
-        url = url.replace("{last_deleted}", str(deleted))
-        headers = dict(req.get("headers") or {})
-        if student_header:
-            headers["X-Student-Id"] = code
-        method = req.get("method", "GET")
-        await postman.request(method, url, headers=headers, content=req.get("body"))
-        if method == "DELETE":
-            deleted = int(url.rsplit("/", 1)[1])
+    last: dict[str, str] = {}  # access_token / api_key из последних ответов
+    with ExitStack() as clock:
+        for req in requests:
+            if select_task and not selected and not req.get("untracked"):
+                r = await client.put("/api/journal/task", json={"task_id": task_id})
+                assert r.status_code == 200, r.text
+                selected = True
+            assert not (selected and req.get("untracked")), "untracked — только до выбора"
+            if req.get("reset_limit"):
+                limited.window.reset()
+                continue
+            if "advance" in req:
+                later = auth_tokens.now() + timedelta(seconds=req["advance"])
+                clock.enter_context(_FrozenNow(later))
+                continue
+            deleted = await _send_phase2(postman, code, req, student_header, deleted, last)
     items = (await client.get("/api/journal")).json()["items"]
     return [entry_response(e) for e in items if e["task_code"] == task_id]
+
+
+class _FrozenNow:
+    """Сдвинуть часы учебной авторизации (просрочка токена без sleep)."""
+
+    def __init__(self, later: datetime) -> None:
+        self.later = later
+        self.saved = auth_tokens.now
+
+    def __enter__(self) -> None:
+        auth_tokens.now = lambda: self.later
+
+    def __exit__(self, *exc: object) -> None:
+        auth_tokens.now = self.saved
+
+
+def _fill(text: str, last: dict[str, str]) -> str:
+    for name, value in last.items():
+        text = text.replace(f"{{last:{name}}}", value)
+    return text
+
+
+async def _send_phase2(
+    postman: AsyncClient,
+    code: str,
+    req: Req,
+    student_header: bool,
+    deleted: int | None,
+    last: dict[str, str],
+) -> int | None:
+    """Отправить один запрос «из Postman»; вернуть id последнего удалённого тикета."""
+    url = _fill(req["url"], last)
+    for title in _ID_RE.findall(url):
+        url = url.replace(f"{{id:{title}}}", str(await ticket_id(postman, code, title)))
+    url = url.replace("{last_deleted}", str(deleted))
+    headers = {k: _fill(v, last) for k, v in (req.get("headers") or {}).items()}
+    if student_header:
+        headers["X-Student-Id"] = code
+    method = req.get("method", "GET")
+    r = await postman.request(method, url, headers=headers, content=req.get("body"))
+    try:
+        data = r.json()
+    except ValueError:
+        data = None
+    if isinstance(data, dict):
+        last.update({k: data[k] for k in ("access_token", "api_key") if k in data})
+    if method == "DELETE":
+        return int(url.rsplit("/", 1)[1])
+    return deleted
 
 
 def test_every_phase2_task_has_solution() -> None:
