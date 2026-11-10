@@ -296,14 +296,39 @@ tasks:
       > `{"title": "Promo code does not work", "status": "in_progress"}`
       > and getting `422`. What's wrong?”
 
-      **What to do** (headers `X-Student-Id`, `X-Task-Code: ch03-task9`,
+      **How to do it** (headers `X-Student-Id`, `X-Task-Code: ch03-task9`,
       `Content-Type: application/json`):
 
-      1. Find the `id` of the ticket “Promo code does not work”.
-      2. Send the `PUT` **exactly like the developer** and get a `422`.
-      3. Use the response body (`details`) to find what's missing, fix it and send again.
+      1. Find the `id` of the ticket “Promo code does not work” — it's the 10th, the
+         last one on the first page of `GET {{BASE_URL}}/api/tickets`.
+      2. **Reproduce:** `PUT {{BASE_URL}}/api/tickets/<id>`, **Body** → **raw** →
+         **JSON**, with the body exactly like the developer's:
+
+         ```json
+         {"title": "Promo code does not work", "status": "in_progress"}
+         ```
+
+         The server answers `422`. Look at `details.missing` in the response body —
+         which field is missing.
+      3. **Fix it:** add that field with its previous value (`low`) and send again:
+
+         ```json
+         {"title": "Promo code does not work", "priority": "low", "status": "in_progress"}
+         ```
 
       **What you should get:** first `422`, then `200` — the ticket is `in_progress`.
+
+      **Look at the `200` response:** what happened to the `description` field?
+
+      <details markdown="1">
+      <summary>Check yourself</summary>
+
+      The description is now empty: `PUT` replaces the whole ticket, and there was no
+      `description` in the body. The error is gone, but the “quick fix” wiped data. To
+      change only the status, `PATCH {"status": "in_progress"}` is the right call — as
+      in task 4.
+
+      </details>
 
       **Write an answer to the developer** in 1–2 sentences.
 
@@ -311,8 +336,8 @@ tasks:
       <summary>Sample answer</summary>
 
       > “`PUT` replaces the whole ticket, so the body needs all required fields —
-      > `priority` is missing (see `details.missing` in the response). Add it or use
-      > `PATCH`, which changes only the fields you send.”
+      > `priority` is missing (see `details.missing` in the response). To change only
+      > the status, use `PATCH`: a `PUT` without `description` wipes the description.”
 
       </details>
     expected:
