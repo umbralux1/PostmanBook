@@ -101,6 +101,8 @@
               </template>
             </div>
             <div x-show="opened === e.id" class="pm-console-detail">
+              <h4>▶ Request Headers</h4>
+              <pre x-html="prettyHeaders(e.headers)"></pre>
               <h4>◀ Response Headers</h4>
               <pre x-html="prettyHeaders(e.response.headers)"></pre>
               <h4>◀ Response Body</h4>

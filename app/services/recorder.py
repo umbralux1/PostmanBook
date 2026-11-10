@@ -124,7 +124,7 @@ async def record_exchange(
 ) -> Response:
     """Middleware: записать запрос и ответ ученика, вернуть ответ клиенту."""
     response, body = await capture_response(response)
-    snap = snapshot_from_request(request, request_body)
+    snap = snapshot_from_request(request, request_body, partial_secrets=True)
     try:
         store(student_code, snap, response.status_code, response.headers, body)
     except Exception:  # журнал не должен ломать ответ учебного API
@@ -155,6 +155,7 @@ def received_out(r: ReceivedRequest, task: Task | None, lang: str) -> dict[str, 
         "method": r.method,
         "path": r.path,
         "query": r.query,
+        "headers": r.headers,
         "received_at": r.received_at.isoformat(),
         "response": {
             "status": r.response_status,

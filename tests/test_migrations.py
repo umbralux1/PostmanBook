@@ -40,6 +40,9 @@ def test_upgrade_with_existing_users_and_attempts(tmp_path: Path, monkeypatch: o
             code = c.execute(text("SELECT student_code FROM user")).scalar_one()
             assert code and len(code) == 6
             assert c.execute(text("SELECT count(*) FROM attempt")).scalar_one() == 1
+            # Глава 4: пароль по умолчанию у старых пользователей, таблица токенов пустая.
+            assert c.execute(text("SELECT auth_password_hash FROM user")).scalar_one() is None
+            assert c.execute(text("SELECT count(*) FROM auth_token")).scalar_one() == 0
             assert c.execute(text("PRAGMA foreign_key_check")).fetchall() == []
         engine.dispose()
     finally:

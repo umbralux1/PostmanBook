@@ -34,3 +34,5 @@ class User(SQLModel, table=True):
     )
     # Учебный набор тикетов уже выдан (повторно не создаётся, даже если всё удалить).
     tickets_seeded: bool = False
+    # Глава 4: хеш учебного пароля после смены; None — пароль по умолчанию (support123).
+    auth_password_hash: str | None = Field(default=None, max_length=64)

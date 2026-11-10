@@ -139,7 +139,8 @@ app/
 показывает, что получил сервер. Справа — панель **«Твой Postman»**
 (`components/postman_panel.html`, `static/js/phase2.js`): личный код и `X-Task-Code`
 выбранного задания с кнопками «Скопировать», результат проверки (Test Results) и
-журнал запросов (метод, путь, статус, раскрываемые заголовки и тело ответа).
+журнал запросов (метод, путь, статус; в раскрытой записи — заголовки запроса, заголовки
+и тело ответа).
 
 - Ученик шлёт запросы с двумя заголовками: `X-Student-Id` (личный код,
   `User.student_code`) и `X-Task-Code` (id задания).
@@ -175,6 +176,12 @@ app/
 | `GET /api/tickets?status=&page=&limit=` | Список: `{items, page, limit, total, pages, count}`; `page` с 1, `limit` 1..100 (по умолчанию 10), `count` — сколько на этой странице |
 | `POST /api/tickets/reset` | Вернуть тикеты ученика к учебному набору (нужен `X-Student-Id`, иначе `400 student_required`) |
 | `GET /api/limited` | Учебный лимит: 3 запроса за 10 с на ученика (`X-Student-Id`, без него — на IP). Дальше `429 rate_limited` + `Retry-After: N`; в ответах `X-RateLimit-Limit`/`X-RateLimit-Remaining` |
+| `POST /api/auth/login` | Глава 4: `{username, password, expires_in?}` → `{access_token, token_type, expires_in, expires_at, username, role}`. Учётка `agent` / `support123`, `expires_in` 5..3600 с (по умолчанию 900). Ошибки: 401 `invalid_credentials`, 415, 422 |
+| `GET /api/auth/me` | «Кто я»: принимает `Authorization: Bearer <токен>`, `Authorization: Basic <base64>` и `X-API-Key`; в ответе `auth` — каким способом вошли (`bearer`/`basic`/`api_key`) |
+| `POST /api/auth/api-keys` | Создать API-ключ (`201 {api_key}`), нужна авторизация |
+| `POST /api/auth/change-password` | `{old_password, new_password}`: меняет пароль ученика и отзывает все его токены и ключи. Нужны авторизация и `X-Student-Id` (в песочнице `400 student_required`); неверный старый — `400 invalid_old_password`; токен чужого ученика — `403 foreign_account` |
+| `POST /api/auth/reset` | Вернуть пароль `support123` и отозвать всё (нужен `X-Student-Id`) |
+| `GET /api/admin/users` | Только для роли `admin` — у учётки `agent` всегда `403 insufficient_role` (`details.required_role`, `details.your_role`) |
 | `GET /api/journal` | Фаза 2: журнал ученика (по cookie) за 30 минут: `{student_code, items}` |
 | `GET /api/journal/stream` | Фаза 2: SSE журнала ученика, событие `request` |
 | `POST /api/tasks/{code}/complete` | Фазы 1–2: фронт сообщает, что задание выполнено (фаза 1 — всем онлайн в комнате, фаза 2 — только себе) |
@@ -187,8 +194,23 @@ app/
 Все ошибки возвращаются в одном формате: `{"error": "code", "message": "...", "details": {...}}`.
 Интерактивная документация: `/docs`.
 
-Заголовки `Authorization` и `Cookie` в ответе echo и в БД заменяются на `***`
-(как советует раздел 2.5 главы 2).
+Секреты в заголовках (`services/snapshot.py`): в ответе echo `Authorization`,
+`X-API-Key`, `Cookie` заменяются на `***` (как советует раздел 2.5 главы 2). В журнале
+ученика (и в БД) `Cookie` — `***`, а `Authorization` и `X-API-Key` — частично: видно
+схему, начало и конец (`Bearer tok_3f…9a`, ключ `key_12…c4`), пароль Basic — `Basic ***`.
+Так ученик видит, что токен ушёл тот и со словом `Bearer`, а полного секрета нет.
+
+**Авторизация (глава 4, `app/api/auth.py`, `services/auth_tokens.py`).** У каждого
+ученика (`X-Student-Id`) своя учётка `agent`, свой пароль, токены и ключи (таблица
+`auth_token`, пароль после смены — `User.auth_password_hash`); без кода — общая
+песочница с паролем по умолчанию. Токены — непрозрачные строки `tok_…`, ключи — `key_…`
+(JWT — в отдельной главе). Причина `401` — в поле `error`: `missing_credentials`
+(нет пропуска; если токен или ключ в query — сообщение об этом и `details.query_param`),
+`malformed_authorization` (нет `Bearer`, двоеточие, кавычки, неизвестная схема, не base64),
+`invalid_token` (нет такого, обрезан, ключ вместо токена и наоборот), `token_expired`,
+`token_revoked`, `invalid_credentials`. У `401` заголовок `WWW-Authenticate: Bearer
+realm="trainer"` (для токена — с `error="invalid_token"`). Время в тестах подменяют
+через `auth_tokens.now`.
 
 **`X-Request-ID`.** Каждый ответ `/api/*` (и ошибки тоже) несёт заголовок
 `X-Request-ID`: uuid4 или номер, присланный клиентом в том же заголовке (если он из
